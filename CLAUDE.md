@@ -142,7 +142,7 @@ interface StateDiff {
 
 ### Phase 2 — 시각화 셸
 
-- [ ] 2.1 앱 레이아웃: 좌측 커밋 그래프(SVG) / 우측 3영역 패널 / 하단 명령 입력창 + 출력 로그
+- [x] 2.1 앱 레이아웃: 좌측 커밋 그래프(SVG) / 우측 3영역 패널 / 하단 명령 입력창 + 출력 로그
 - [ ] 2.2 커밋 DAG 레이아웃 알고리즘: 레인(lane) 배정. 브랜치 십수 개 규모면 단순 탐욕 배정으로 충분. 레이아웃은 순수 함수로 분리 (`layout(commits) → positions`)
 - [ ] 2.3 refs 렌더링: 브랜치 라벨, HEAD 포인터 (symbolic이면 브랜치에 붙고, detached면 커밋에 직접)
 - [ ] 2.4 3영역 패널: working tree / index / HEAD 컬럼, `git status` 로직 기반 파일 상태 배지
