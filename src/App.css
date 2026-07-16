@@ -149,40 +149,46 @@
 }
 
 /* ── 3영역 패널 ────────────────────────────────── */
-.areas {
+.areas-table {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 1px;
-  background: var(--line);
-  min-height: 100%;
+  grid-template-columns: minmax(90px, 1.3fr) 1fr 1fr 1fr;
 }
-.area {
-  background: var(--panel);
-  padding: 8px 10px;
+.cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  min-height: 30px;
 }
-.area h3 {
-  margin: 0 0 6px;
+.cell-file {
+  overflow-wrap: anywhere;
+}
+.cell-sha {
+  white-space: nowrap;
+}
+.cell-header {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
 }
-.area ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.head-context {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
 }
-.area li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  padding: 2px 0;
-  overflow-wrap: anywhere;
+.cell-file {
+  color: var(--ink);
 }
-.area .empty {
-  padding: 0;
+.cell-sha {
+  color: var(--accent);
+}
+.cell-absent {
+  color: var(--line);
 }
 .badge {
   font-size: 10px;
