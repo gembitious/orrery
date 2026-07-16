@@ -6,6 +6,10 @@
  * HEAD의 두 형태를 시각적으로 구분한다:
  *   symbolic → [HEAD]가 브랜치 칩에 붙어서 그려진다 (HEAD는 브랜치를 가리킨다)
  *   detached → [HEAD] 칩이 커밋에 직접 붙는다
+ *
+ * FLIP 규칙: 위치 지정용 transform 속성이 있는 g의 "안쪽" 그룹에
+ * data-flip-key를 단다 (CSS transform과 속성 transform의 충돌 방지).
+ * 커밋 노드는 pop으로 등장, ref 칩은 커밋 사이를 날아다닌다(키가 이름 기준).
  */
 import { shortSha } from '../core/objects';
 import type { Repository } from '../core/repository';
@@ -35,11 +39,17 @@ function edgePath(x1: number, y1: number, x2: number, y2: number): string {
 
 function Chip({ x, text, kind }: { x: number; text: string; kind: 'head' | 'branch' }) {
   return (
-    <g className={`chip chip-${kind}`} transform={`translate(${x} ${-CHIP_H / 2})`}>
-      <rect width={chipW(text)} height={CHIP_H} rx={3} />
-      <text x={chipW(text) / 2} y={CHIP_H / 2 + 4} textAnchor="middle">
-        {text}
-      </text>
+    <g transform={`translate(${x} ${-CHIP_H / 2})`}>
+      <g
+        className={`chip chip-${kind}`}
+        data-flip-key={`ref:${kind === 'head' ? 'HEAD' : text}`}
+        data-flip-enter="pop"
+      >
+        <rect width={chipW(text)} height={CHIP_H} rx={3} />
+        <text x={chipW(text) / 2} y={CHIP_H / 2 + 4} textAnchor="middle">
+          {text}
+        </text>
+      </g>
     </g>
   );
 }
@@ -77,6 +87,8 @@ export function GraphPanel({ repo }: { repo: Repository }) {
                 <path
                   key={`${node.sha}-${parent}`}
                   className="edge"
+                  data-flip-key={`edge:${node.sha}:${parent}`}
+                  data-flip-enter="fade"
                   d={edgePath(laneX(from.lane), rowY(from.row), laneX(to.lane), rowY(to.row))}
                 />
               );
@@ -87,7 +99,12 @@ export function GraphPanel({ repo }: { repo: Repository }) {
             if (p === undefined) return null;
             return (
               <g key={node.sha} transform={`translate(${laneX(p.lane)} ${rowY(p.row)})`}>
-                <circle className={node.sha === headSha ? 'node node-head' : 'node'} r={NODE_R} />
+                <g data-flip-key={`node:${node.sha}`} data-flip-enter="pop">
+                  <circle
+                    className={node.sha === headSha ? 'node node-head' : 'node'}
+                    r={NODE_R}
+                  />
+                </g>
               </g>
             );
           })}
@@ -107,7 +124,7 @@ export function GraphPanel({ repo }: { repo: Repository }) {
 
             let x = SHA_COL_W;
             const rendered = chips.map((chip, i) => {
-              const el = <Chip key={i} x={x} text={chip.text} kind={chip.kind} />;
+              const el = <Chip key={chip.text + chip.kind} x={x} text={chip.text} kind={chip.kind} />;
               // HEAD 칩과 그 브랜치 칩은 붙여서 "HEAD가 브랜치에 붙어 있음"을 표현
               const gap = chip.kind === 'head' && chips[i + 1]?.kind === 'branch' ? 1 : 6;
               x += chipW(chip.text) + gap;
@@ -116,13 +133,15 @@ export function GraphPanel({ repo }: { repo: Repository }) {
 
             return (
               <g key={node.sha} transform={`translate(${labelX} ${rowY(p.row)})`}>
-                <text className="node-sha" dy="4">
-                  {shortSha(node.sha)}
-                </text>
+                <g data-flip-key={`label:${node.sha}`} data-flip-enter="fade">
+                  <text className="node-sha" dy="4">
+                    {shortSha(node.sha)}
+                  </text>
+                  <text className="node-msg" x={x + 4} dy="4">
+                    {node.commit.message.split('\n')[0]}
+                  </text>
+                </g>
                 {rendered}
-                <text className="node-msg" x={x + 4} dy="4">
-                  {node.commit.message.split('\n')[0]}
-                </text>
               </g>
             );
           })}

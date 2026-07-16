@@ -10,15 +10,17 @@ import type { AreaRow } from './areasData';
 import { buildAreasView } from './areasData';
 
 function Cell({
+  flipKey,
   cell,
   deleted,
 }: {
+  flipKey: string;
   cell?: { sha: string; badge?: string };
   deleted: boolean;
 }) {
   if (cell !== undefined) {
     return (
-      <div className="cell">
+      <div className="cell" data-flip-key={flipKey} data-flip-val={cell.sha}>
         <span className="cell-sha">{shortSha(cell.sha)}</span>
         {cell.badge !== undefined && (
           <span className={`badge badge-${cell.badge}`}>{cell.badge}</span>
@@ -28,21 +30,27 @@ function Cell({
   }
   if (deleted) {
     return (
-      <div className="cell cell-deleted">
+      <div className="cell cell-deleted" data-flip-key={flipKey} data-flip-val="deleted">
         <span className="badge badge-deleted">deleted</span>
       </div>
     );
   }
-  return <div className="cell cell-absent">—</div>;
+  return (
+    <div className="cell cell-absent" data-flip-key={flipKey} data-flip-val="">
+      —
+    </div>
+  );
 }
 
 function Row({ row }: { row: AreaRow }) {
   return (
     <>
-      <div className="cell cell-file">{row.file}</div>
-      <Cell cell={row.worktree} deleted={row.worktreeDeleted} />
-      <Cell cell={row.index} deleted={row.indexDeleted} />
-      <Cell cell={row.head} deleted={false} />
+      <div className="cell cell-file" data-flip-key={`cell:file:${row.file}`} data-flip-enter="fade">
+        {row.file}
+      </div>
+      <Cell flipKey={`cell:wt:${row.file}`} cell={row.worktree} deleted={row.worktreeDeleted} />
+      <Cell flipKey={`cell:idx:${row.file}`} cell={row.index} deleted={row.indexDeleted} />
+      <Cell flipKey={`cell:head:${row.file}`} cell={row.head} deleted={false} />
     </>
   );
 }

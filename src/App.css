@@ -132,6 +132,20 @@
 .chip text {
   font-size: 12px;
 }
+svg [data-flip-key] {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ghost-chip {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font: 600 11px ui-monospace, Menlo, Consolas, monospace;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
 .chip-head rect {
   fill: var(--accent);
 }
