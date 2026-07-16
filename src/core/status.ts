@@ -13,6 +13,7 @@ import type { Sha } from './objects';
 import { hashObject } from './objects';
 import type { Repository } from './repository';
 import { resolveHead } from './repository';
+import { commitTreeMap } from './revision';
 
 export type IndexState = 'added' | 'modified' | 'deleted';
 export type WorktreeState = 'modified' | 'deleted' | 'untracked';
@@ -37,19 +38,10 @@ export interface RepoStatus {
   clean: boolean;
 }
 
-/** HEAD 커밋의 tree를 filename → blob sha 맵으로 펼친다 */
+/** HEAD 커밋의 tree를 filename → blob sha 맵으로 펼친다. unborn이면 빈 맵 */
 function headTreeMap(repo: Repository): Map<string, Sha> {
-  const map = new Map<string, Sha>();
   const headSha = resolveHead(repo);
-  if (headSha === undefined) return map;
-
-  const commit = repo.objects.get(headSha);
-  if (commit?.type !== 'commit') return map;
-  const tree = repo.objects.get(commit.tree);
-  if (tree?.type !== 'tree') return map;
-
-  for (const entry of tree.entries) map.set(entry.name, entry.sha);
-  return map;
+  return headSha === undefined ? new Map() : commitTreeMap(repo, headSha);
 }
 
 export function computeStatus(repo: Repository): RepoStatus {

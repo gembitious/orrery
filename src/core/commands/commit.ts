@@ -6,10 +6,11 @@
  * HEAD 커밋의 tree와 sha가 같으면 내용이 정확히 같다는 뜻이다 — 비교가 해시
  * 한 번으로 끝난다. content-addressed 저장의 힘.
  */
-import type { GitObject, Sha, TreeEntry } from '../objects';
+import type { GitObject, TreeEntry } from '../objects';
 import { hashObject, shortSha } from '../objects';
 import type { Repository } from '../repository';
 import { resolveHead } from '../repository';
+import { getCommit } from '../revision';
 import type { CommandResult } from '../result';
 import { emptyDiff, failure, success } from '../result';
 import { computeStatus } from '../status';
@@ -17,14 +18,6 @@ import { computeStatus } from '../status';
 // SIMPLIFIED: config(user.name/user.email)가 없으므로 고정 identity를 쓴다
 const AUTHOR_NAME = 'Orrery';
 const AUTHOR_EMAIL = 'orrery@example.com';
-
-function getCommit(repo: Repository, sha: Sha): Extract<GitObject, { type: 'commit' }> {
-  const obj = repo.objects.get(sha);
-  if (obj === undefined || obj.type !== 'commit') {
-    throw new Error(`orrery 내부 오류: ${sha}는 commit 객체가 아닙니다`);
-  }
-  return obj;
-}
 
 /** index == HEAD tree일 때, 실제 git이 내는 세 갈래의 "커밋할 것 없음" 문구 */
 function nothingToCommitError(repo: Repository, isInitial: boolean): string {

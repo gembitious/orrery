@@ -3,6 +3,8 @@
  * UI는 이 함수 하나만 알면 된다.
  */
 import { gitAdd } from '../core/commands/add';
+import { gitBranchCreate, gitBranchDelete, gitBranchList } from '../core/commands/branch';
+import { gitCheckout, gitCheckoutNewBranch } from '../core/commands/checkout';
 import { gitCommit } from '../core/commands/commit';
 import { removeFile, writeFile } from '../core/commands/fs';
 import { gitInit } from '../core/commands/init';
@@ -69,6 +71,10 @@ function executeGit(repo: Repository, args: Token[]): CommandResult {
       return parseAdd(repo, rest);
     case 'commit':
       return parseCommit(repo, rest);
+    case 'branch':
+      return parseBranch(repo, rest);
+    case 'checkout':
+      return parseCheckout(repo, rest);
     case 'status': {
       if (rest.length > 0) {
         return failure(
@@ -129,6 +135,54 @@ function parseCommit(repo: Repository, args: Token[]): CommandResult {
     return failure(repo, 'orrery: 에디터가 없으므로 -m "메시지" 형식으로 입력하세요');
   }
   return gitCommit(repo, message);
+}
+
+/** `git branch` (목록) / `git branch <이름>` / `git branch -d|-D <이름>` */
+function parseBranch(repo: Repository, args: Token[]): CommandResult {
+  if (args.length === 0) return gitBranchList(repo);
+
+  const first = args[0];
+  if (!first.quoted && (first.value === '-d' || first.value === '-D')) {
+    if (args.length !== 2) {
+      return failure(repo, `orrery: 'git branch ${first.value} <이름>' 형식으로 입력하세요`);
+    }
+    return gitBranchDelete(repo, args[1].value, first.value === '-D');
+  }
+  const option = args.find((t) => !t.quoted && t.value.startsWith('-'));
+  if (option !== undefined) {
+    return failure(
+      repo,
+      `orrery: 'git branch'의 옵션 '${option.value}'은(는) 아직 지원하지 않습니다`,
+    );
+  }
+  if (args.length === 1) return gitBranchCreate(repo, args[0].value);
+  return failure(repo, "orrery: 'git branch'는 '<이름>' 또는 '-d/-D <이름>'만 지원합니다");
+}
+
+/** `git checkout <브랜치|커밋>` / `git checkout -b <이름> [<시작점>]` */
+function parseCheckout(repo: Repository, args: Token[]): CommandResult {
+  if (args.length === 0) {
+    return failure(repo, "orrery: 'git checkout <브랜치|커밋>' 또는 '-b <이름>'이 필요합니다");
+  }
+  const first = args[0];
+  if (!first.quoted && first.value === '-b') {
+    if (args.length < 2) return failure(repo, "error: switch 'b' requires a value");
+    if (args.length > 3) {
+      return failure(repo, "orrery: 'git checkout -b <이름> [<시작점>]' 형식으로 입력하세요");
+    }
+    return gitCheckoutNewBranch(repo, args[1].value, args[2]?.value);
+  }
+  const option = args.find((t) => !t.quoted && t.value.startsWith('-'));
+  if (option !== undefined) {
+    return failure(
+      repo,
+      `orrery: 'git checkout'의 옵션 '${option.value}'은(는) 아직 지원하지 않습니다`,
+    );
+  }
+  if (args.length !== 1) {
+    return failure(repo, "orrery: 'git checkout'은 대상 하나만 지원합니다");
+  }
+  return gitCheckout(repo, args[0].value);
 }
 
 /**

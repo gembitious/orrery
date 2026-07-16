@@ -8,6 +8,8 @@ import type { Head, Repository } from './repository';
 export interface StateDiff {
   createdObjects: Sha[];
   movedRefs: { ref: string; from?: Sha; to: Sha }[];
+  /** 삭제된 ref (git branch -d). movedRefs는 to가 필수라 삭제를 표현할 수 없다 */
+  deletedRefs?: string[];
   headChange?: { from: Head; to: Head };
   indexChanges: { file: string; kind: 'staged' | 'unstaged' | 'modified' }[];
   workingTreeChanges: { file: string; kind: 'created' | 'modified' | 'deleted' }[];
