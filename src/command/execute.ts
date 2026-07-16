@@ -6,6 +6,7 @@ import { gitAdd } from '../core/commands/add';
 import { gitCommit } from '../core/commands/commit';
 import { removeFile, writeFile } from '../core/commands/fs';
 import { gitInit } from '../core/commands/init';
+import { gitStatus } from '../core/commands/status';
 import type { Repository } from '../core/repository';
 import type { CommandResult } from '../core/result';
 import { failure, success } from '../core/result';
@@ -68,6 +69,15 @@ function executeGit(repo: Repository, args: Token[]): CommandResult {
       return parseAdd(repo, rest);
     case 'commit':
       return parseCommit(repo, rest);
+    case 'status': {
+      if (rest.length > 0) {
+        return failure(
+          repo,
+          `orrery: 'git status'의 인자 '${rest[0].value}'은(는) 아직 지원하지 않습니다`,
+        );
+      }
+      return gitStatus(repo);
+    }
     default:
       break;
   }

@@ -12,6 +12,7 @@ import type { Repository } from '../repository';
 import { resolveHead } from '../repository';
 import type { CommandResult } from '../result';
 import { emptyDiff, failure, success } from '../result';
+import { computeStatus } from '../status';
 
 // SIMPLIFIED: config(user.name/user.email)가 없으므로 고정 identity를 쓴다
 const AUTHOR_NAME = 'Orrery';
@@ -27,12 +28,9 @@ function getCommit(repo: Repository, sha: Sha): Extract<GitObject, { type: 'comm
 
 /** index == HEAD tree일 때, 실제 git이 내는 세 갈래의 "커밋할 것 없음" 문구 */
 function nothingToCommitError(repo: Repository, isInitial: boolean): string {
-  const modified = [...repo.index.values()].some((entry) => {
-    const content = repo.workingTree.get(entry.name);
-    if (content === undefined) return true; // working tree에서 삭제됨
-    return hashObject({ type: 'blob', content }) !== entry.sha;
-  });
-  const untracked = [...repo.workingTree.keys()].some((name) => !repo.index.has(name));
+  const { entries } = computeStatus(repo);
+  const modified = entries.some((e) => e.worktree === 'modified' || e.worktree === 'deleted');
+  const untracked = entries.some((e) => e.worktree === 'untracked');
 
   if (modified) return 'no changes added to commit (use "git add" and/or "git commit -a")';
   if (untracked) return 'nothing added to commit but untracked files present (use "git add" to track)';
