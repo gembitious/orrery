@@ -1,12 +1,16 @@
 /**
  * 좌측 커밋 그래프 (SVG 직접 렌더링).
- * 위치 계산은 전부 layoutCommits(순수 함수)가 하고, 여기는 좌표 변환과 그리기만.
- * 브랜치 라벨/HEAD 포인터 렌더링은 2.3에서.
+ * 위치 계산은 layoutCommits(순수 함수), ref 라벨 수집은 collectLabels가 하고
+ * 여기는 좌표 변환과 그리기만 한다.
+ *
+ * HEAD의 두 형태를 시각적으로 구분한다:
+ *   symbolic → [HEAD]가 브랜치 칩에 붙어서 그려진다 (HEAD는 브랜치를 가리킨다)
+ *   detached → [HEAD] 칩이 커밋에 직접 붙는다
  */
 import { shortSha } from '../core/objects';
 import type { Repository } from '../core/repository';
 import { resolveHead } from '../core/repository';
-import { listCommitsByTime } from './graphData';
+import { collectLabels, listCommitsByTime } from './graphData';
 import { layoutCommits } from './layout';
 
 const ROW_H = 56;
@@ -14,9 +18,13 @@ const LANE_W = 36;
 const PAD_X = 28;
 const PAD_Y = 32;
 const NODE_R = 9;
+const CHIP_H = 18;
+const CHAR_W = 7.3; // ui-monospace 12px 기준 추정 폭 — 모노스페이스라 안정적
+const SHA_COL_W = 60;
 
 const laneX = (lane: number): number => PAD_X + lane * LANE_W;
 const rowY = (row: number): number => PAD_Y + row * ROW_H;
+const chipW = (text: string): number => Math.round(text.length * CHAR_W) + 12;
 
 /** 같은 레인은 직선, 레인이 다르면 완만한 베지어로 잇는다 */
 function edgePath(x1: number, y1: number, x2: number, y2: number): string {
@@ -25,9 +33,21 @@ function edgePath(x1: number, y1: number, x2: number, y2: number): string {
   return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
 }
 
+function Chip({ x, text, kind }: { x: number; text: string; kind: 'head' | 'branch' }) {
+  return (
+    <g className={`chip chip-${kind}`} transform={`translate(${x} ${-CHIP_H / 2})`}>
+      <rect width={chipW(text)} height={CHIP_H} rx={3} />
+      <text x={chipW(text) / 2} y={CHIP_H / 2 + 4} textAnchor="middle">
+        {text}
+      </text>
+    </g>
+  );
+}
+
 export function GraphPanel({ repo }: { repo: Repository }) {
   const nodes = listCommitsByTime(repo);
   const layout = layoutCommits(nodes);
+  const labels = collectLabels(repo);
   const headSha = resolveHead(repo);
   const labelX = PAD_X + layout.laneCount * LANE_W + 8;
 
@@ -74,12 +94,33 @@ export function GraphPanel({ repo }: { repo: Repository }) {
           {nodes.map((node) => {
             const p = layout.positions.get(node.sha);
             if (p === undefined) return null;
+            const l = labels.get(node.sha);
+            const chips: { text: string; kind: 'head' | 'branch' }[] = [];
+            if (l !== undefined) {
+              if (l.detachedHead) chips.push({ text: 'HEAD', kind: 'head' });
+              if (l.headBranch !== undefined) {
+                chips.push({ text: 'HEAD', kind: 'head' });
+                chips.push({ text: l.headBranch, kind: 'branch' });
+              }
+              for (const name of l.branches) chips.push({ text: name, kind: 'branch' });
+            }
+
+            let x = SHA_COL_W;
+            const rendered = chips.map((chip, i) => {
+              const el = <Chip key={i} x={x} text={chip.text} kind={chip.kind} />;
+              // HEAD 칩과 그 브랜치 칩은 붙여서 "HEAD가 브랜치에 붙어 있음"을 표현
+              const gap = chip.kind === 'head' && chips[i + 1]?.kind === 'branch' ? 1 : 6;
+              x += chipW(chip.text) + gap;
+              return el;
+            });
+
             return (
               <g key={node.sha} transform={`translate(${labelX} ${rowY(p.row)})`}>
                 <text className="node-sha" dy="4">
                   {shortSha(node.sha)}
                 </text>
-                <text className="node-msg" x={70} dy="4">
+                {rendered}
+                <text className="node-msg" x={x + 4} dy="4">
                   {node.commit.message.split('\n')[0]}
                 </text>
               </g>

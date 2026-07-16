@@ -6,6 +6,7 @@
   --muted: #7a7263;
   --line: #e4dfd5;
   --accent: #a8701f;
+  --accent-contrast: #ffffff;
   --chip: #f0ece3;
   --term-bg: #191612;
   --term-ink: #d8d2c4;
@@ -25,6 +26,7 @@
     --muted: #9c9382;
     --line: #2e2a24;
     --accent: #d9a54f;
+    --accent-contrast: #1c1508;
     --chip: #262219;
   }
 }
@@ -126,6 +128,24 @@
 .node-msg {
   fill: var(--ink);
   font-size: 12px;
+}
+.chip text {
+  font-size: 12px;
+}
+.chip-head rect {
+  fill: var(--accent);
+}
+.chip-head text {
+  fill: var(--accent-contrast);
+  font-weight: 600;
+}
+.chip-branch rect {
+  fill: var(--panel);
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+.chip-branch text {
+  fill: var(--ink);
 }
 
 /* ── 3영역 패널 ────────────────────────────────── */
