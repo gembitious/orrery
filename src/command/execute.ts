@@ -3,6 +3,7 @@
  * UI는 이 함수 하나만 알면 된다.
  */
 import { gitAdd } from '../core/commands/add';
+import { gitCommit } from '../core/commands/commit';
 import { removeFile, writeFile } from '../core/commands/fs';
 import { gitInit } from '../core/commands/init';
 import type { Repository } from '../core/repository';
@@ -65,6 +66,8 @@ function executeGit(repo: Repository, args: Token[]): CommandResult {
   switch (sub) {
     case 'add':
       return parseAdd(repo, rest);
+    case 'commit':
+      return parseCommit(repo, rest);
     default:
       break;
   }
@@ -86,6 +89,36 @@ function parseAdd(repo: Repository, args: Token[]): CommandResult {
     return failure(repo, 'Nothing specified, nothing added.');
   }
   return gitAdd(repo, args.map((t) => t.value));
+}
+
+/** `git commit -m "메시지"` — -m 필수 (에디터가 없으므로), 그 외 옵션 미지원 */
+function parseCommit(repo: Repository, args: Token[]): CommandResult {
+  let message: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const token = args[i];
+    if (token.value === '-m' && !token.quoted) {
+      if (message !== undefined) {
+        return failure(repo, "orrery: '-m' 여러 개는 아직 지원하지 않습니다");
+      }
+      const next = args[i + 1];
+      if (next === undefined) {
+        return failure(repo, "error: switch 'm' requires a value");
+      }
+      message = next.value;
+      i++;
+    } else if (token.value.startsWith('-') && !token.quoted) {
+      return failure(
+        repo,
+        `orrery: 'git commit'의 옵션 '${token.value}'은(는) 아직 지원하지 않습니다`,
+      );
+    } else {
+      return failure(repo, `orrery: 'git commit'의 인자 '${token.value}'은(는) 지원하지 않습니다`);
+    }
+  }
+  if (message === undefined) {
+    return failure(repo, 'orrery: 에디터가 없으므로 -m "메시지" 형식으로 입력하세요');
+  }
+  return gitCommit(repo, message);
 }
 
 /**

@@ -27,6 +27,11 @@ export interface Repository {
   clock: number; // 시뮬레이션 시계 (커밋 타임스탬프용 단조 증가 카운터)
 }
 
+/** HEAD가 최종적으로 가리키는 커밋. unborn branch(첫 커밋 전)면 undefined. */
+export function resolveHead(repo: Repository): Sha | undefined {
+  return repo.head.kind === 'detached' ? repo.head.sha : repo.refs.get(repo.head.ref);
+}
+
 /** git init 전의 빈 작업 디렉터리. 파일을 만들고 나서 init하는 것도 실제 git처럼 가능하다. */
 export function createRepository(): Repository {
   return {
