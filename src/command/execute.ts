@@ -2,6 +2,7 @@
  * Command Layer 진입점: 입력 문자열 → 토큰화 → 명령별 파서 → 코어 API 호출.
  * UI는 이 함수 하나만 알면 된다.
  */
+import { gitAdd } from '../core/commands/add';
 import { removeFile, writeFile } from '../core/commands/fs';
 import { gitInit } from '../core/commands/init';
 import type { Repository } from '../core/repository';
@@ -60,10 +61,31 @@ function executeGit(repo: Repository, args: Token[]): CommandResult {
   if (!repo.initialized && KNOWN_GIT_COMMANDS.has(sub)) {
     return failure(repo, 'fatal: not a git repository (or any of the parent directories): .git');
   }
+
+  switch (sub) {
+    case 'add':
+      return parseAdd(repo, rest);
+    default:
+      break;
+  }
+
   if (KNOWN_GIT_COMMANDS.has(sub)) {
     return failure(repo, `orrery: '${sub}'은(는) 아직 지원하지 않습니다`);
   }
   return failure(repo, `git: '${sub}' is not a git command. See 'git --help'.`);
+}
+
+/** `git add <pathspec>...` / `git add .` — 옵션(-A, -p, -u 등)은 미지원 */
+function parseAdd(repo: Repository, args: Token[]): CommandResult {
+  const option = args.find((t) => !t.quoted && t.value.startsWith('-'));
+  if (option !== undefined) {
+    return failure(repo, `orrery: 'git add'의 옵션 '${option.value}'은(는) 아직 지원하지 않습니다`);
+  }
+  if (args.length === 0) {
+    // 실제 git 문구
+    return failure(repo, 'Nothing specified, nothing added.');
+  }
+  return gitAdd(repo, args.map((t) => t.value));
 }
 
 /**
