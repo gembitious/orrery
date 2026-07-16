@@ -8,6 +8,7 @@ import { gitCheckout, gitCheckoutNewBranch } from '../core/commands/checkout';
 import { gitCommit } from '../core/commands/commit';
 import { removeFile, writeFile } from '../core/commands/fs';
 import { gitInit } from '../core/commands/init';
+import { gitLog } from '../core/commands/log';
 import { gitStatus } from '../core/commands/status';
 import type { Repository } from '../core/repository';
 import type { CommandResult } from '../core/result';
@@ -83,6 +84,15 @@ function executeGit(repo: Repository, args: Token[]): CommandResult {
         );
       }
       return gitStatus(repo);
+    }
+    case 'log': {
+      if (rest.length > 0) {
+        return failure(
+          repo,
+          `orrery: 'git log'의 인자 '${rest[0].value}'은(는) 아직 지원하지 않습니다`,
+        );
+      }
+      return gitLog(repo);
     }
     default:
       break;

@@ -138,7 +138,7 @@ interface StateDiff {
 - [x] 1.4 `git commit -m`: index → tree 객체 → commit 객체, HEAD의 브랜치 전진. 빈 index("nothing to commit") 등 에러 경로 포함
 - [x] 1.5 `git status`: 3영역 비교 로직 (untracked / modified / staged / staged+modified). 이 비교 함수는 UI 3영역 패널이 그대로 재사용한다
 - [x] 1.6 `git branch <name>` / `git branch -d/-D` (미머지 판정 포함) / `git checkout <branch|sha>` / `git checkout -b`. detached HEAD 상태 전이 포함
-- [ ] 1.7 `git log`: first-parent 순회 출력
+- [x] 1.7 `git log`: first-parent 순회 출력
 
 ### Phase 2 — 시각화 셸
 
