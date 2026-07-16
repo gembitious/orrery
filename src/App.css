@@ -238,12 +238,22 @@ svg [data-flip-key] {
   color: var(--term-dim);
   margin: 0;
 }
+.terminal-entry {
+  margin-bottom: 2px;
+}
 .terminal-cmd {
   color: #fff;
 }
 .terminal-cmd::before {
   content: '$ ';
   color: var(--accent);
+}
+.entry-error .terminal-cmd {
+  color: var(--term-err);
+}
+.entry-error .terminal-cmd::after {
+  content: ' ✗';
+  color: var(--term-err);
 }
 .terminal-out {
   color: var(--term-ok);
