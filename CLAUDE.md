@@ -88,6 +88,7 @@ interface IndexEntry {
 
 // ── Repository (최상위 상태) ─────────────────────
 interface Repository {
+  initialized: boolean;           // git init 전에는 false — 가상 FS 명령만 동작
   objects: Map<Sha, GitObject>;
   refs: Map<string, Sha>;         // 'refs/heads/main' → sha
   head: Head;
@@ -114,6 +115,7 @@ interface CommandResult {
 interface StateDiff {
   createdObjects: Sha[];
   movedRefs: { ref: string; from?: Sha; to: Sha }[];
+  deletedRefs?: string[];         // git branch -d — movedRefs는 to가 필수라 삭제 표현 불가
   headChange?: { from: Head; to: Head };
   indexChanges: { file: string; kind: 'staged' | 'unstaged' | 'modified' }[];
   workingTreeChanges: { file: string; kind: 'created' | 'modified' | 'deleted' }[];

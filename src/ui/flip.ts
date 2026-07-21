@@ -60,7 +60,9 @@ export function createFlip(getRoot: () => HTMLElement | null): FlipController {
     const root = getRoot();
     const prev = before;
     before = new Map();
-    if (root === null || prev.size === 0 || reducedMotion()) return;
+    // prev가 비어 있어도 진행한다 — 빈 저장소에서의 첫 명령도 등장 애니메이션을 받는다
+    // (마운트 직후의 play는 keyed 요소가 없어 자연히 no-op)
+    if (root === null || reducedMotion()) return;
 
     const after = collect(root);
 

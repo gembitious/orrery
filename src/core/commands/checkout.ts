@@ -41,6 +41,7 @@ function planSwitch(repo: Repository, targetSha: string): SwitchPlan {
   const workingTree = new Map<string, string>();
   const blockedLocal: string[] = [];
   const blockedUntracked: string[] = [];
+  const blockedRemoved: string[] = [];
 
   for (const file of files) {
     const cur = currentTree.get(file);
@@ -62,6 +63,17 @@ function planSwitch(repo: Repository, targetSha: string): SwitchPlan {
         index.set(file, { name: file, sha: tgt });
         workingTree.set(file, blobContent(repo, tgt));
       }
+      continue;
+    }
+
+    if (tgt === undefined && (st.index === 'deleted' || st.worktree === 'deleted')) {
+      // 로컬에서 지운 파일을 대상 브랜치도 갖고 있지 않다 — 충돌이 아니라 삭제 확정
+      // (실제 git 2.43으로 검증: 두 경우 모두 전환 허용, 결과는 clean)
+      const content = repo.workingTree.get(file);
+      if (content === undefined) continue;
+      // 단, 삭제를 stage한 뒤 같은 이름으로 다시 만든 untracked 파일이 있으면
+      // 대상 전환이 그 파일을 지워야 하므로 거부한다 (git의 "removed" 문구)
+      blockedRemoved.push(file);
       continue;
     }
 
@@ -98,6 +110,16 @@ function planSwitch(repo: Repository, targetSha: string): SwitchPlan {
       error:
         'error: The following untracked working tree files would be overwritten by checkout:\n' +
         `${blockedUntracked.map((f) => `\t${f}`).join('\n')}\n` +
+        'Please move or remove them before you switch branches.\nAborting',
+    };
+  }
+  if (blockedRemoved.length > 0) {
+    return {
+      index,
+      workingTree,
+      error:
+        'error: The following untracked working tree files would be removed by checkout:\n' +
+        `${blockedRemoved.map((f) => `\t${f}`).join('\n')}\n` +
         'Please move or remove them before you switch branches.\nAborting',
     };
   }

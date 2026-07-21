@@ -106,6 +106,42 @@ describe('git checkout <branch>', () => {
   });
 });
 
+describe('로컬 삭제 + 대상 브랜치에도 없는 파일 (실제 git 2.43 동작 대조)', () => {
+  // nog는 g.txt가 생기기 전(c1)에서 분기 — main에만 g.txt가 있다
+  const NOG = [
+    ...BASE,
+    'git branch nog',
+    'echo world > g.txt', 'git add g.txt', 'git commit -m addg',
+  ];
+
+  it('WT에서만 지운 경우: 전환 허용, 결과는 clean', () => {
+    const repo = run([...NOG, 'rm g.txt']);
+    const result = execute(repo, 'git checkout nog');
+    expect(result.error).toBeUndefined();
+    expect(result.repo.workingTree.has('g.txt')).toBe(false);
+    expect(result.repo.index.has('g.txt')).toBe(false);
+    expect(computeStatus(result.repo).clean).toBe(true);
+  });
+
+  it('삭제를 stage한 경우: 전환 허용, 결과는 clean', () => {
+    const repo = run([...NOG, 'rm g.txt', 'git add g.txt']);
+    const result = execute(repo, 'git checkout nog');
+    expect(result.error).toBeUndefined();
+    expect(computeStatus(result.repo).clean).toBe(true);
+  });
+
+  it('삭제 stage 후 같은 이름의 untracked 파일을 만들었으면 removed 문구로 거부', () => {
+    const repo = run([...NOG, 'rm g.txt', 'git add g.txt', 'echo other > g.txt']);
+    const result = execute(repo, 'git checkout nog');
+    expect(result.error).toBe(
+      'error: The following untracked working tree files would be removed by checkout:\n' +
+        '\tg.txt\n' +
+        'Please move or remove them before you switch branches.\nAborting',
+    );
+    expect(result.repo).toBe(repo);
+  });
+});
+
 describe('git checkout <sha> — detached HEAD', () => {
   it('축약 해시로 checkout하면 HEAD가 커밋을 직접 가리킨다', () => {
     const repo = run(DIVERGED_G);
