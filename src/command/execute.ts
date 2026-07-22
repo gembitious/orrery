@@ -9,6 +9,8 @@ import { gitCommit } from '../core/commands/commit';
 import { removeFile, writeFile } from '../core/commands/fs';
 import { gitInit } from '../core/commands/init';
 import { gitLog } from '../core/commands/log';
+import type { ResetMode } from '../core/commands/reset';
+import { gitReset } from '../core/commands/reset';
 import { gitStatus } from '../core/commands/status';
 import type { Repository } from '../core/repository';
 import type { CommandResult } from '../core/result';
@@ -76,6 +78,8 @@ function executeGit(repo: Repository, args: Token[]): CommandResult {
       return parseBranch(repo, rest);
     case 'checkout':
       return parseCheckout(repo, rest);
+    case 'reset':
+      return parseReset(repo, rest);
     case 'status': {
       if (rest.length > 0) {
         return failure(
@@ -193,6 +197,36 @@ function parseCheckout(repo: Repository, args: Token[]): CommandResult {
     return failure(repo, "orrery: 'git checkout'은 대상 하나만 지원합니다");
   }
   return gitCheckout(repo, args[0].value);
+}
+
+/** `git reset [--soft|--mixed|--hard] [<commit>]` — 기본은 --mixed, 대상 기본은 HEAD */
+function parseReset(repo: Repository, args: Token[]): CommandResult {
+  let mode: ResetMode = 'mixed';
+  let modeSeen = false;
+  let target: string | undefined;
+
+  for (const token of args) {
+    if (!token.quoted && (token.value === '--soft' || token.value === '--mixed' || token.value === '--hard')) {
+      if (modeSeen) {
+        return failure(repo, "orrery: reset 모드 옵션은 하나만 지정하세요");
+      }
+      modeSeen = true;
+      mode = token.value === '--soft' ? 'soft' : token.value === '--mixed' ? 'mixed' : 'hard';
+      continue;
+    }
+    if (!token.quoted && token.value.startsWith('-')) {
+      return failure(
+        repo,
+        `orrery: 'git reset'의 옵션 '${token.value}'은(는) 아직 지원하지 않습니다`,
+      );
+    }
+    if (target !== undefined) {
+      return failure(repo, "orrery: 'git reset'은 대상 커밋 하나만 지원합니다 (파일 단위 reset은 미지원)");
+    }
+    target = token.value;
+  }
+
+  return gitReset(repo, mode, target ?? 'HEAD');
 }
 
 /**

@@ -10,7 +10,7 @@ import { hashObject, shortSha } from '../objects';
 import type { Head, IndexEntry, Repository } from '../repository';
 import { resolveHead } from '../repository';
 import type { CommandResult, StateDiff } from '../result';
-import { emptyDiff, failure, success } from '../result';
+import { emptyDiff, failure, success, workspaceDiff } from '../result';
 import { blobContent, commitTreeMap, getCommit, resolveCommitish } from '../revision';
 import { computeStatus } from '../status';
 import { isValidBranchName } from './branch';
@@ -128,38 +128,7 @@ function planSwitch(repo: Repository, targetSha: string): SwitchPlan {
 
 /** plan 적용 전후의 index/working tree 차이를 StateDiff로 기록한다 */
 function diffFromPlan(repo: Repository, plan: SwitchPlan): StateDiff {
-  const diff = emptyDiff();
-  const files = [
-    ...new Set([
-      ...repo.workingTree.keys(),
-      ...plan.workingTree.keys(),
-      ...repo.index.keys(),
-      ...plan.index.keys(),
-    ]),
-  ].sort();
-
-  for (const file of files) {
-    const wtBefore = repo.workingTree.get(file);
-    const wtAfter = plan.workingTree.get(file);
-    if (wtBefore === undefined && wtAfter !== undefined) {
-      diff.workingTreeChanges.push({ file, kind: 'created' });
-    } else if (wtBefore !== undefined && wtAfter === undefined) {
-      diff.workingTreeChanges.push({ file, kind: 'deleted' });
-    } else if (wtBefore !== wtAfter) {
-      diff.workingTreeChanges.push({ file, kind: 'modified' });
-    }
-
-    const idxBefore = repo.index.get(file)?.sha;
-    const idxAfter = plan.index.get(file)?.sha;
-    if (idxBefore === undefined && idxAfter !== undefined) {
-      diff.indexChanges.push({ file, kind: 'staged' });
-    } else if (idxBefore !== undefined && idxAfter === undefined) {
-      diff.indexChanges.push({ file, kind: 'unstaged' });
-    } else if (idxBefore !== idxAfter) {
-      diff.indexChanges.push({ file, kind: 'modified' });
-    }
-  }
-  return diff;
+  return workspaceDiff(repo, plan.index, plan.workingTree);
 }
 
 export function gitCheckout(repo: Repository, target: string): CommandResult {

@@ -53,6 +53,19 @@ describe('deriveSlides', () => {
     expect(deriveSlides(result.diff, result.repo)).toEqual([]);
   });
 
+  it('git reset --mixed: index가 통째로 바뀌어도 add 슬라이드를 만들지 않는다', () => {
+    const repo = run([...BASE, 'echo world > g.txt', 'git add g.txt', 'git commit -m c2',
+      'echo v2 > f.txt', 'git add f.txt']);
+    const result = execute(repo, 'git reset HEAD~1');
+    expect(deriveSlides(result.diff, result.repo)).toEqual([]);
+  });
+
+  it('git reset HEAD(제자리 unstage): staged sha가 WT 해시와 다르므로 슬라이드 없음', () => {
+    const repo = run([...BASE, 'echo v2 > f.txt', 'git add f.txt']);
+    const result = execute(repo, 'git reset');
+    expect(deriveSlides(result.diff, result.repo)).toEqual([]);
+  });
+
   it('git checkout: headChange가 있으므로 add 슬라이드를 만들지 않는다', () => {
     const repo = run([
       ...BASE,
