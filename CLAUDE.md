@@ -88,6 +88,7 @@ interface IndexEntry {
 
 // ── Repository (최상위 상태) ─────────────────────
 interface Repository {
+  initialized: boolean;           // git init 전에는 false — 가상 FS 명령만 동작
   objects: Map<Sha, GitObject>;
   refs: Map<string, Sha>;         // 'refs/heads/main' → sha
   head: Head;
@@ -114,6 +115,7 @@ interface CommandResult {
 interface StateDiff {
   createdObjects: Sha[];
   movedRefs: { ref: string; from?: Sha; to: Sha }[];
+  deletedRefs?: string[];         // git branch -d — movedRefs는 to가 필수라 삭제 표현 불가
   headChange?: { from: Head; to: Head };
   indexChanges: { file: string; kind: 'staged' | 'unstaged' | 'modified' }[];
   workingTreeChanges: { file: string; kind: 'created' | 'modified' | 'deleted' }[];
@@ -133,21 +135,21 @@ interface StateDiff {
 ### Phase 1 — 코어 상태 머신 (UI 없음, vitest만)
 
 - [x] 1.1 객체 직렬화 + SHA-1: blob/tree/commit 직렬화, 해시 계산. known-answer 테스트 (실제 git으로 만든 해시와 대조: `echo -n 'hello' | git hash-object --stdin` = `b6fc4c620b67d95f953a5c1c1230aaab5db5a1b0`... 정확한 값은 검증하며 작성)
-- [ ] 1.2 Repository + `init`, 가상 FS 명령 (`echo >`, `rm`)
-- [ ] 1.3 `git add <file>` / `git add .`: blob 생성 + index 갱신
-- [ ] 1.4 `git commit -m`: index → tree 객체 → commit 객체, HEAD의 브랜치 전진. 빈 index("nothing to commit") 등 에러 경로 포함
-- [ ] 1.5 `git status`: 3영역 비교 로직 (untracked / modified / staged / staged+modified). 이 비교 함수는 UI 3영역 패널이 그대로 재사용한다
-- [ ] 1.6 `git branch <name>` / `git branch -d/-D` (미머지 판정 포함) / `git checkout <branch|sha>` / `git checkout -b`. detached HEAD 상태 전이 포함
-- [ ] 1.7 `git log`: first-parent 순회 출력
+- [x] 1.2 Repository + `init`, 가상 FS 명령 (`echo >`, `rm`)
+- [x] 1.3 `git add <file>` / `git add .`: blob 생성 + index 갱신
+- [x] 1.4 `git commit -m`: index → tree 객체 → commit 객체, HEAD의 브랜치 전진. 빈 index("nothing to commit") 등 에러 경로 포함
+- [x] 1.5 `git status`: 3영역 비교 로직 (untracked / modified / staged / staged+modified). 이 비교 함수는 UI 3영역 패널이 그대로 재사용한다
+- [x] 1.6 `git branch <name>` / `git branch -d/-D` (미머지 판정 포함) / `git checkout <branch|sha>` / `git checkout -b`. detached HEAD 상태 전이 포함
+- [x] 1.7 `git log`: first-parent 순회 출력
 
 ### Phase 2 — 시각화 셸
 
-- [ ] 2.1 앱 레이아웃: 좌측 커밋 그래프(SVG) / 우측 3영역 패널 / 하단 명령 입력창 + 출력 로그
-- [ ] 2.2 커밋 DAG 레이아웃 알고리즘: 레인(lane) 배정. 브랜치 십수 개 규모면 단순 탐욕 배정으로 충분. 레이아웃은 순수 함수로 분리 (`layout(commits) → positions`)
-- [ ] 2.3 refs 렌더링: 브랜치 라벨, HEAD 포인터 (symbolic이면 브랜치에 붙고, detached면 커밋에 직접)
-- [ ] 2.4 3영역 패널: working tree / index / HEAD 컬럼, `git status` 로직 기반 파일 상태 배지
-- [ ] 2.5 StateDiff → FLIP 애니메이션: 새 커밋 등장, ref 이동, 파일이 컬럼 간 슬라이드
-- [ ] 2.6 명령 입력창: 히스토리(↑↓), 에러 표시
+- [x] 2.1 앱 레이아웃: 좌측 커밋 그래프(SVG) / 우측 3영역 패널 / 하단 명령 입력창 + 출력 로그
+- [x] 2.2 커밋 DAG 레이아웃 알고리즘: 레인(lane) 배정. 브랜치 십수 개 규모면 단순 탐욕 배정으로 충분. 레이아웃은 순수 함수로 분리 (`layout(commits) → positions`)
+- [x] 2.3 refs 렌더링: 브랜치 라벨, HEAD 포인터 (symbolic이면 브랜치에 붙고, detached면 커밋에 직접)
+- [x] 2.4 3영역 패널: working tree / index / HEAD 컬럼, `git status` 로직 기반 파일 상태 배지
+- [x] 2.5 StateDiff → FLIP 애니메이션: 새 커밋 등장, ref 이동, 파일이 컬럼 간 슬라이드
+- [x] 2.6 명령 입력창: 히스토리(↑↓), 에러 표시
 
 ### Phase 3 — 3영역 심화 (이 프로젝트의 킬러 콘텐츠)
 
