@@ -11,6 +11,7 @@ import { hashObject, shortSha } from '../objects';
 import type { Repository } from '../repository';
 import { resolveHead } from '../repository';
 import { getCommit } from '../revision';
+import { formatDate } from './log';
 import type { CommandResult } from '../result';
 import { emptyDiff, failure, success } from '../result';
 import { computeStatus } from '../status';
@@ -97,4 +98,79 @@ export function gitCommit(repo: Repository, rawMessage: string): CommandResult {
   const summary = message.split('\n')[0];
   // SIMPLIFIED: 실제 git이 뒤에 붙이는 "N files changed, ..." 통계 줄은 생략
   return success(next, [`[${label}${rootMarker} ${shortSha(commitSha)}] ${summary}`], diff);
+}
+
+/**
+ * `git commit --amend [-m <msg>]` — tip 커밋의 "수정"이 아니라 "교체"다.
+ * 같은 부모를 가리키는 새 커밋을 만들고 브랜치를 옮긴다. 원래 커밋은
+ * unreachable로 남는다 (그래프에서 그대로 보인다 — 해시가 왜 바뀌는지도).
+ *
+ * author는 원본 것을 유지하고 committer만 새로 찍는다 (실제 git 동작).
+ * SIMPLIFIED: -m이 없으면 에디터 대신 --no-edit처럼 기존 메시지를 유지한다.
+ */
+export function gitCommitAmend(repo: Repository, rawMessage?: string): CommandResult {
+  const headSha = resolveHead(repo);
+  if (headSha === undefined) {
+    return failure(repo, 'fatal: You have nothing to amend.');
+  }
+  const old = getCommit(repo, headSha);
+
+  if (rawMessage !== undefined && rawMessage.trim() === '') {
+    return failure(repo, 'Aborting commit due to empty commit message.');
+  }
+  const message =
+    rawMessage === undefined ? old.message : `${rawMessage.replace(/\n+$/, '')}\n`;
+
+  const entries: TreeEntry[] = [...repo.index.values()].map((e) => ({
+    mode: '100644',
+    name: e.name,
+    sha: e.sha,
+  }));
+  const tree: GitObject = { type: 'tree', entries };
+  const treeSha = hashObject(tree);
+
+  const timestamp = repo.clock + 1;
+  const commit: GitObject = {
+    type: 'commit',
+    tree: treeSha,
+    parents: old.parents, // 부모는 그대로 — 히스토리에서 old를 밀어내고 그 자리에 선다
+    author: old.author,
+    committer: { name: AUTHOR_NAME, email: AUTHOR_EMAIL, timestamp },
+    message,
+  };
+  const commitSha = hashObject(commit);
+
+  const objects = new Map(repo.objects);
+  const diff = emptyDiff();
+  if (!objects.has(treeSha)) {
+    objects.set(treeSha, tree);
+    diff.createdObjects.push(treeSha);
+  }
+  objects.set(commitSha, commit);
+  diff.createdObjects.push(commitSha);
+
+  const next: Repository = { ...repo, objects, clock: timestamp };
+
+  let label: string;
+  if (repo.head.kind === 'symbolic') {
+    const refs = new Map(repo.refs);
+    refs.set(repo.head.ref, commitSha);
+    next.refs = refs;
+    diff.movedRefs.push({ ref: repo.head.ref, from: headSha, to: commitSha });
+    label = repo.head.ref.replace(/^refs\/heads\//, '');
+  } else {
+    next.head = { kind: 'detached', sha: commitSha };
+    diff.headChange = { from: repo.head, to: next.head };
+    label = 'detached HEAD';
+  }
+
+  // 실제 git처럼 원본 author 날짜를 Date: 줄로 보여준다 (amend는 root 마커를 붙이지 않는다)
+  return success(
+    next,
+    [
+      `[${label} ${shortSha(commitSha)}] ${message.split('\n')[0]}`,
+      ` Date: ${formatDate(old.author.timestamp)}`,
+    ],
+    diff,
+  );
 }

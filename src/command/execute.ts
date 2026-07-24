@@ -5,13 +5,14 @@
 import { gitAdd } from '../core/commands/add';
 import { gitBranchCreate, gitBranchDelete, gitBranchList } from '../core/commands/branch';
 import { gitCheckout, gitCheckoutNewBranch } from '../core/commands/checkout';
-import { gitCommit } from '../core/commands/commit';
+import { gitCommit, gitCommitAmend } from '../core/commands/commit';
 import { removeFile, writeFile } from '../core/commands/fs';
 import { gitInit } from '../core/commands/init';
 import { gitLog } from '../core/commands/log';
 import type { ResetMode } from '../core/commands/reset';
 import { gitReset } from '../core/commands/reset';
 import { gitRestoreStaged, gitRestoreWorktree } from '../core/commands/restore';
+import { gitRmCached } from '../core/commands/rm';
 import { gitStash, gitStashList, gitStashPop } from '../core/commands/stash';
 import { gitStatus } from '../core/commands/status';
 import type { Repository } from '../core/repository';
@@ -84,6 +85,30 @@ function executeGit(repo: Repository, args: Token[]): CommandResult {
       return parseReset(repo, rest);
     case 'restore':
       return parseRestore(repo, rest);
+    case 'rm': {
+      const force = rest.some((t) => !t.quoted && t.value === '-f');
+      const cached = rest.some((t) => !t.quoted && t.value === '--cached');
+      const files = rest.filter((t) => t.quoted || !t.value.startsWith('-')).map((t) => t.value);
+      const unknown = rest.find(
+        (t) => !t.quoted && t.value.startsWith('-') && t.value !== '-f' && t.value !== '--cached',
+      );
+      if (unknown !== undefined) {
+        return failure(
+          repo,
+          `orrery: 'git rm'의 옵션 '${unknown.value}'은(는) 아직 지원하지 않습니다`,
+        );
+      }
+      if (!cached) {
+        return failure(
+          repo,
+          "orrery: 'git rm'은 --cached만 지원합니다 (working tree 삭제는 가상 명령 rm)",
+        );
+      }
+      if (files.length === 0) {
+        return failure(repo, "orrery: 'git rm --cached <파일>...' 형식으로 입력하세요");
+      }
+      return gitRmCached(repo, files, force);
+    }
     case 'stash': {
       if (rest.length === 0) return gitStash(repo);
       const sub2 = rest[0].value;
@@ -135,9 +160,11 @@ function parseAdd(repo: Repository, args: Token[]): CommandResult {
   return gitAdd(repo, args.map((t) => t.value));
 }
 
-/** `git commit -m "메시지"` — -m 필수 (에디터가 없으므로), 그 외 옵션 미지원 */
+/** `git commit -m "메시지"` / `git commit --amend [--no-edit] [-m "메시지"]` */
 function parseCommit(repo: Repository, args: Token[]): CommandResult {
   let message: string | undefined;
+  let amend = false;
+  let noEdit = false;
   for (let i = 0; i < args.length; i++) {
     const token = args[i];
     if (token.value === '-m' && !token.quoted) {
@@ -150,6 +177,10 @@ function parseCommit(repo: Repository, args: Token[]): CommandResult {
       }
       message = next.value;
       i++;
+    } else if (token.value === '--amend' && !token.quoted) {
+      amend = true;
+    } else if (token.value === '--no-edit' && !token.quoted) {
+      noEdit = true;
     } else if (token.value.startsWith('-') && !token.quoted) {
       return failure(
         repo,
@@ -158,6 +189,14 @@ function parseCommit(repo: Repository, args: Token[]): CommandResult {
     } else {
       return failure(repo, `orrery: 'git commit'의 인자 '${token.value}'은(는) 지원하지 않습니다`);
     }
+  }
+
+  if (amend) {
+    // -m이 없으면 --no-edit처럼 기존 메시지 유지 (에디터가 없으므로)
+    return gitCommitAmend(repo, message);
+  }
+  if (noEdit) {
+    return failure(repo, "orrery: '--no-edit'은 --amend와 함께만 지원합니다");
   }
   if (message === undefined) {
     return failure(repo, 'orrery: 에디터가 없으므로 -m "메시지" 형식으로 입력하세요');
