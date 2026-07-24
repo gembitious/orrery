@@ -14,7 +14,7 @@
 import { shortSha } from '../core/objects';
 import type { Repository } from '../core/repository';
 import { resolveHead } from '../core/repository';
-import { collectLabels, listCommitsByTime } from './graphData';
+import { collectLabels, listCommitsByTime, stashInternalCommits } from './graphData';
 import { layoutCommits } from './layout';
 
 const ROW_H = 56;
@@ -37,7 +37,7 @@ function edgePath(x1: number, y1: number, x2: number, y2: number): string {
   return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
 }
 
-function Chip({ x, text, kind }: { x: number; text: string; kind: 'head' | 'branch' }) {
+function Chip({ x, text, kind }: { x: number; text: string; kind: 'head' | 'branch' | 'stash' }) {
   return (
     <g transform={`translate(${x} ${-CHIP_H / 2})`}>
       <g
@@ -54,8 +54,9 @@ function Chip({ x, text, kind }: { x: number; text: string; kind: 'head' | 'bran
   );
 }
 
-export function GraphPanel({ repo }: { repo: Repository }) {
-  const nodes = listCommitsByTime(repo);
+export function GraphPanel({ repo, showStash }: { repo: Repository; showStash: boolean }) {
+  const hidden = showStash ? new Set<string>() : stashInternalCommits(repo);
+  const nodes = listCommitsByTime(repo).filter((n) => !hidden.has(n.sha));
   const layout = layoutCommits(nodes);
   const labels = collectLabels(repo);
   const headSha = resolveHead(repo);
@@ -112,7 +113,7 @@ export function GraphPanel({ repo }: { repo: Repository }) {
             const p = layout.positions.get(node.sha);
             if (p === undefined) return null;
             const l = labels.get(node.sha);
-            const chips: { text: string; kind: 'head' | 'branch' }[] = [];
+            const chips: { text: string; kind: 'head' | 'branch' | 'stash' }[] = [];
             if (l !== undefined) {
               if (l.detachedHead) chips.push({ text: 'HEAD', kind: 'head' });
               if (l.headBranch !== undefined) {
@@ -120,6 +121,7 @@ export function GraphPanel({ repo }: { repo: Repository }) {
                 chips.push({ text: l.headBranch, kind: 'branch' });
               }
               for (const name of l.branches) chips.push({ text: name, kind: 'branch' });
+              for (const name of l.stashes) chips.push({ text: name, kind: 'stash' });
             }
 
             let x = SHA_COL_W;

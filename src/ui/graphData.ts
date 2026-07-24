@@ -28,6 +28,8 @@ export interface CommitLabels {
   detachedHead: boolean;
   /** 이 커밋을 가리키는 나머지 브랜치들 (이름순) */
   branches: string[];
+  /** 이 커밋을 가리키는 stash 라벨 ('stash@{0}' 등 — WIP 커밋에 붙는다) */
+  stashes: string[];
 }
 
 /** 커밋 sha → 그 커밋에 그릴 ref 라벨들. HEAD의 두 형태가 구분되는 것이 핵심 */
@@ -36,7 +38,7 @@ export function collectLabels(repo: Repository): Map<Sha, CommitLabels> {
   const get = (sha: Sha): CommitLabels => {
     let labels = map.get(sha);
     if (labels === undefined) {
-      labels = { detachedHead: false, branches: [] };
+      labels = { detachedHead: false, branches: [], stashes: [] };
       map.set(sha, labels);
     }
     return labels;
@@ -57,5 +59,24 @@ export function collectLabels(repo: Repository): Map<Sha, CommitLabels> {
   if (repo.head.kind === 'detached') {
     get(repo.head.sha).detachedHead = true;
   }
+  repo.stashes.forEach((sha, i) => {
+    get(sha).stashes.push(`stash@{${i}}`);
+  });
   return map;
+}
+
+/**
+ * 토글 OFF일 때 그래프에서 숨길 stash 내부 커밋들:
+ * 각 WIP 커밋과 그 두 번째 부모(index 커밋).
+ */
+export function stashInternalCommits(repo: Repository): Set<Sha> {
+  const hidden = new Set<Sha>();
+  for (const wipSha of repo.stashes) {
+    hidden.add(wipSha);
+    const wip = repo.objects.get(wipSha);
+    if (wip?.type === 'commit' && wip.parents[1] !== undefined) {
+      hidden.add(wip.parents[1]);
+    }
+  }
+  return hidden;
 }

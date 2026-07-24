@@ -3,7 +3,7 @@
  * StateDiff는 UI가 "무엇이 변했는가"를 애니메이션으로 옮기기 위한 데이터다.
  */
 import type { Sha } from './objects';
-import type { Head, Repository } from './repository';
+import type { Head, IndexEntry, Repository } from './repository';
 
 export interface StateDiff {
   createdObjects: Sha[];
@@ -42,4 +42,48 @@ export function success(
 /** 실패: repo는 손대지 않고 원본을 그대로 돌려준다 */
 export function failure(repo: Repository, error: string): CommandResult {
   return { repo, output: [], error, diff: emptyDiff() };
+}
+
+/**
+ * index/working tree를 통째로 교체하는 명령(checkout, reset)의 전후 차이를
+ * StateDiff의 indexChanges/workingTreeChanges로 기록한다.
+ * ref/HEAD 이동은 호출부가 채운다.
+ */
+export function workspaceDiff(
+  before: Repository,
+  index: Map<string, IndexEntry>,
+  workingTree: Map<string, string>,
+): StateDiff {
+  const diff = emptyDiff();
+  const files = [
+    ...new Set([
+      ...before.workingTree.keys(),
+      ...workingTree.keys(),
+      ...before.index.keys(),
+      ...index.keys(),
+    ]),
+  ].sort();
+
+  for (const file of files) {
+    const wtBefore = before.workingTree.get(file);
+    const wtAfter = workingTree.get(file);
+    if (wtBefore === undefined && wtAfter !== undefined) {
+      diff.workingTreeChanges.push({ file, kind: 'created' });
+    } else if (wtBefore !== undefined && wtAfter === undefined) {
+      diff.workingTreeChanges.push({ file, kind: 'deleted' });
+    } else if (wtBefore !== wtAfter) {
+      diff.workingTreeChanges.push({ file, kind: 'modified' });
+    }
+
+    const idxBefore = before.index.get(file)?.sha;
+    const idxAfter = index.get(file)?.sha;
+    if (idxBefore === undefined && idxAfter !== undefined) {
+      diff.indexChanges.push({ file, kind: 'staged' });
+    } else if (idxBefore !== undefined && idxAfter === undefined) {
+      diff.indexChanges.push({ file, kind: 'unstaged' });
+    } else if (idxBefore !== idxAfter) {
+      diff.indexChanges.push({ file, kind: 'modified' });
+    }
+  }
+  return diff;
 }

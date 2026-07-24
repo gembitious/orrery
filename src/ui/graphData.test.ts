@@ -30,6 +30,7 @@ describe('collectLabels', () => {
       detachedHead: false,
       headBranch: 'main',
       branches: ['alpha', 'feature'], // 이름순
+      stashes: [],
     });
   });
 

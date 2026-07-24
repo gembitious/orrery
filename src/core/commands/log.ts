@@ -20,7 +20,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** 시뮬레이션 시계(epoch 초)를 git 기본 날짜 포맷으로: 'Thu Jan 1 00:00:01 1970 +0000' */
-function formatDate(timestamp: number): string {
+export function formatDate(timestamp: number): string {
   const d = new Date(timestamp * 1000);
   const pad = (n: number): string => String(n).padStart(2, '0');
   return (

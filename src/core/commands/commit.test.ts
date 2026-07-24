@@ -147,7 +147,7 @@ describe('git commit 에러 경로', () => {
 
   it('미지원 옵션은 명시적 에러', () => {
     const repo = run(FIRST_COMMIT.slice(0, 3));
-    expect(execute(repo, 'git commit --amend -m x').error).toMatch(/'--amend'.*지원하지 않습니다/);
+    expect(execute(repo, 'git commit -a -m x').error).toMatch(/'-a'.*지원하지 않습니다/);
   });
 
   it('실패 시 상태가 변하지 않는다 (clock 포함)', () => {

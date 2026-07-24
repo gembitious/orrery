@@ -60,6 +60,19 @@
   color: var(--muted);
   font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif;
 }
+.stash-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif;
+  cursor: pointer;
+}
+.stash-toggle input {
+  accent-color: var(--accent);
+}
 
 .app-main {
   display: grid;
@@ -160,6 +173,15 @@ svg [data-flip-key] {
 }
 .chip-branch text {
   fill: var(--ink);
+}
+.chip-stash rect {
+  fill: var(--panel);
+  stroke: var(--badge-untracked);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+.chip-stash text {
+  fill: var(--badge-untracked);
 }
 
 /* ── 3영역 패널 ────────────────────────────────── */

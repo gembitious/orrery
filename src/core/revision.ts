@@ -4,6 +4,7 @@
  */
 import type { GitObject, Sha } from './objects';
 import type { Repository } from './repository';
+import { resolveHead } from './repository';
 
 export type CommitObject = Extract<GitObject, { type: 'commit' }>;
 
@@ -52,6 +53,28 @@ export function resolveCommitish(repo: Repository, text: string): Sha | undefine
     if (obj.type === 'commit' && sha.startsWith(text)) matches.push(sha);
   }
   return matches.length === 1 ? matches[0] : undefined;
+}
+
+/**
+ * `HEAD`, `HEAD~N`, `<브랜치|해시>~N` 형태의 리비전 표현을 해석한다.
+ * `~N`은 first-parent를 N번 거슬러 올라간다 (`~` 단독은 `~1`).
+ * SIMPLIFIED: `^`(부모 선택), `@{...}` 등 나머지 rev 문법은 지원하지 않는다.
+ */
+export function resolveRevision(repo: Repository, text: string): Sha | undefined {
+  const [base, ...hops] = text.split('~');
+  let sha = base === 'HEAD' ? resolveHead(repo) : resolveCommitish(repo, base);
+  if (sha === undefined) return undefined;
+
+  for (const hop of hops) {
+    if (!/^\d*$/.test(hop)) return undefined;
+    const count = hop === '' ? 1 : parseInt(hop, 10);
+    for (let i = 0; i < count; i++) {
+      const parent: Sha | undefined = getCommit(repo, sha).parents[0];
+      if (parent === undefined) return undefined; // 루트를 지나침
+      sha = parent;
+    }
+  }
+  return sha;
 }
 
 /** ancestor가 descendant로부터 부모 체인으로 도달 가능한가 (자기 자신 포함) */

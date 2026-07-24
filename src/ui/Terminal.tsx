@@ -54,8 +54,8 @@ export function Terminal({
       <div className="terminal-log" ref={logRef}>
         {entries.length === 0 && (
           <p className="hint">
-            지원 명령: git init · add · commit -m · status · branch · checkout · log,{' '}
-            그리고 echo &quot;내용&quot; &gt; 파일 · rm 파일 — ↑↓로 히스토리 탐색
+            지원 명령: git init · add · commit -m · status · branch · checkout · log · reset ·
+            restore · stash, 그리고 echo &quot;내용&quot; &gt; 파일 · rm 파일 — ↑↓로 히스토리 탐색
           </p>
         )}
         {entries.map((entry, i) => (
