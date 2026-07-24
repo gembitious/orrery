@@ -81,10 +81,10 @@ type Head =
   | { kind: 'detached'; sha: Sha };
 
 // ── Index / Working tree ────────────────────────
-interface IndexEntry {
-  name: string;
-  sha: Sha;         // staged blob
-}
+type IndexEntry =
+  | { name: string; conflicted?: false; sha: Sha }  // 평시 (stage 0)
+  | { name: string; conflicted: true;               // 머지 충돌 (unmerged)
+      stages: { 1?: Sha; 2?: Sha; 3?: Sha } };      // 1=base, 2=ours, 3=theirs
 
 // ── Repository (최상위 상태) ─────────────────────
 interface Repository {
@@ -95,6 +95,7 @@ interface Repository {
   index: Map<string, IndexEntry>; // filename → entry
   workingTree: Map<string, string>; // filename → content
   stashes: Sha[];                 // stash 스택 (WIP 커밋 sha, [0]이 최신) — reflog 대체
+  merging?: { theirs: Sha; message: string }; // 진행 중 머지 (MERGE_HEAD + MERGE_MSG)
   clock: number;                  // 시뮬레이션 시계
 }
 ```
@@ -162,7 +163,7 @@ interface StateDiff {
 ### Phase 4 — 히스토리 조작
 
 - [x] 4.1 `git merge`: fast-forward / 3-way 구분, merge commit (parents 2개)
-- [ ] 4.2 충돌 상태 모델링: conflicted index (stage 1/2/3 단순화 가능), 충돌 마커가 든 working tree 파일, `git add` → `git commit`으로 해소하는 플로우
+- [x] 4.2 충돌 상태 모델링: conflicted index (stage 1/2/3 단순화 가능), 충돌 마커가 든 working tree 파일, `git add` → `git commit`으로 해소하는 플로우
 - [ ] 4.3 `git rebase <branch>`: 커밋 재적용, 원본 커밋과 새 커밋의 관계 시각화 (재적용 시 해시가 바뀐다는 것이 눈에 보여야 함)
 - [ ] 4.4 `git cherry-pick`
 

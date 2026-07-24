@@ -14,7 +14,7 @@
  */
 import { hashObject, shortSha } from '../core/objects';
 import type { Repository } from '../core/repository';
-import { resolveHead } from '../core/repository';
+import { resolveHead, stagedSha } from '../core/repository';
 import type { StateDiff } from '../core/result';
 import { commitTreeMap } from '../core/revision';
 
@@ -36,15 +36,15 @@ export function deriveSlides(diff: StateDiff, before: Repository, after: Reposit
     // ① add: 새 index 내용이 WT 내용과 같다 → wt → idx
     for (const change of diff.indexChanges) {
       if (change.kind !== 'staged' && change.kind !== 'modified') continue;
-      const entry = after.index.get(change.file);
-      if (entry === undefined) continue;
+      const sha = stagedSha(after.index.get(change.file));
+      if (sha === undefined) continue;
       const wtContent = after.workingTree.get(change.file);
       if (wtContent === undefined) continue;
-      if (hashObject({ type: 'blob', content: wtContent }) !== entry.sha) continue;
+      if (hashObject({ type: 'blob', content: wtContent }) !== sha) continue;
       slides.push({
         fromKey: `cell:wt:${change.file}`,
         toKey: `cell:idx:${change.file}`,
-        label: shortSha(entry.sha),
+        label: shortSha(sha),
       });
       slid.add(change.file);
     }
@@ -53,13 +53,13 @@ export function deriveSlides(diff: StateDiff, before: Repository, after: Reposit
     for (const change of diff.indexChanges) {
       if (slid.has(change.file)) continue; // ①이 이미 설명한 파일 (WT에서 온 것이 우선)
       if (change.kind !== 'staged' && change.kind !== 'modified') continue;
-      const entry = after.index.get(change.file);
-      if (entry === undefined) continue;
-      if (headTree.get(change.file) !== entry.sha) continue;
+      const sha = stagedSha(after.index.get(change.file));
+      if (sha === undefined) continue;
+      if (headTree.get(change.file) !== sha) continue;
       slides.push({
         fromKey: `cell:head:${change.file}`,
         toKey: `cell:idx:${change.file}`,
-        label: shortSha(entry.sha),
+        label: shortSha(sha),
       });
       slid.add(change.file);
     }
@@ -70,13 +70,13 @@ export function deriveSlides(diff: StateDiff, before: Repository, after: Reposit
       const content = after.workingTree.get(change.file);
       if (content === undefined) continue;
       if (before.workingTree.get(change.file) === content) continue; // 실제로 바뀐 것만
-      const entry = after.index.get(change.file);
-      if (entry === undefined) continue;
-      if (hashObject({ type: 'blob', content }) !== entry.sha) continue;
+      const sha = stagedSha(after.index.get(change.file));
+      if (sha === undefined) continue;
+      if (hashObject({ type: 'blob', content }) !== sha) continue;
       slides.push({
         fromKey: `cell:idx:${change.file}`,
         toKey: `cell:wt:${change.file}`,
-        label: shortSha(entry.sha),
+        label: shortSha(sha),
       });
     }
   }
@@ -89,10 +89,12 @@ export function deriveSlides(diff: StateDiff, before: Repository, after: Reposit
       : undefined);
   if (newCommit !== undefined) {
     for (const [file, entry] of after.index) {
+      const sha = stagedSha(entry);
+      if (sha === undefined) continue;
       slides.push({
         fromKey: `cell:idx:${file}`,
         toKey: `cell:head:${file}`,
-        label: shortSha(entry.sha),
+        label: shortSha(sha),
       });
     }
   }

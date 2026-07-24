@@ -7,7 +7,7 @@
  */
 import { hashObject } from '../objects';
 import type { Repository } from '../repository';
-import { resolveHead } from '../repository';
+import { resolveHead, stagedSha } from '../repository';
 import type { CommandResult } from '../result';
 import { emptyDiff, failure, success } from '../result';
 import { commitTreeMap } from '../revision';
@@ -19,11 +19,17 @@ export function gitRmCached(repo: Repository, files: string[], force: boolean): 
     }
   }
 
+  for (const file of files) {
+    if (repo.index.get(file)?.conflicted === true) {
+      return failure(repo, `error: path '${file}' is unmerged`);
+    }
+  }
+
   if (!force) {
     const headSha = resolveHead(repo);
     const headTree = headSha === undefined ? new Map<string, string>() : commitTreeMap(repo, headSha);
     const blocked = files.filter((file) => {
-      const staged = repo.index.get(file)?.sha;
+      const staged = stagedSha(repo.index.get(file));
       if (staged === undefined) return false;
       if (headTree.get(file) === staged) return false;
       const content = repo.workingTree.get(file);

@@ -42,6 +42,23 @@ function Cell({
   );
 }
 
+/** 충돌 셀: stage 1/2/3 세 버전을 그대로 보여준다 — 이것이 unmerged index의 실체 */
+function ConflictCell({ flipKey, stages }: { flipKey: string; stages: { 1?: string; 2?: string; 3?: string } }) {
+  return (
+    <div className="cell cell-conflict" data-flip-key={flipKey} data-flip-val="conflict">
+      <span className="badge badge-conflicted">unmerged</span>
+      {([1, 2, 3] as const).map((n) =>
+        stages[n] !== undefined ? (
+          <span className="stage" key={n}>
+            <span className="stage-n">{n}</span>
+            <span className="cell-sha">{shortSha(stages[n])}</span>
+          </span>
+        ) : null,
+      )}
+    </div>
+  );
+}
+
 function Row({ row }: { row: AreaRow }) {
   return (
     <>
@@ -49,7 +66,11 @@ function Row({ row }: { row: AreaRow }) {
         {row.file}
       </div>
       <Cell flipKey={`cell:wt:${row.file}`} cell={row.worktree} deleted={row.worktreeDeleted} />
-      <Cell flipKey={`cell:idx:${row.file}`} cell={row.index} deleted={row.indexDeleted} />
+      {row.conflict !== undefined ? (
+        <ConflictCell flipKey={`cell:idx:${row.file}`} stages={row.conflict} />
+      ) : (
+        <Cell flipKey={`cell:idx:${row.file}`} cell={row.index} deleted={row.indexDeleted} />
+      )}
       <Cell flipKey={`cell:head:${row.file}`} cell={row.head} deleted={false} />
     </>
   );

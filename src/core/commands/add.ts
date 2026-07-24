@@ -8,6 +8,7 @@
  */
 import { hashObject } from '../objects';
 import type { Repository } from '../repository';
+import { stagedSha } from '../repository';
 import type { CommandResult } from '../result';
 import { emptyDiff, failure, success } from '../result';
 
@@ -55,7 +56,9 @@ export function gitAdd(repo: Repository, pathspecs: string[]): CommandResult {
     }
 
     const prev = index.get(name);
-    if (prev?.sha === sha) continue; // 이미 같은 스냅샷이 staged — no-op
+    if (stagedSha(prev) === sha) continue; // 이미 같은 스냅샷이 staged — no-op
+    // 충돌(unmerged) 엔트리였다면 이 대입이 곧 "해소 표시"다 — stage 1/2/3이
+    // stage 0 하나로 접힌다 (실제 git add의 충돌 해소와 동일)
     index.set(name, { name, sha });
     diff.indexChanges.push({ file: name, kind: prev === undefined ? 'staged' : 'modified' });
   }

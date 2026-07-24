@@ -8,7 +8,7 @@
  */
 import { hashObject, shortSha } from '../objects';
 import type { Head, IndexEntry, Repository } from '../repository';
-import { resolveHead } from '../repository';
+import { conflictedFiles, resolveHead } from '../repository';
 import type { CommandResult, StateDiff } from '../result';
 import { emptyDiff, failure, success, workspaceDiff } from '../result';
 import { blobContent, commitTreeMap, getCommit, resolveCommitish } from '../revision';
@@ -135,6 +135,9 @@ function diffFromPlan(repo: Repository, plan: SwitchPlan): StateDiff {
 }
 
 export function gitCheckout(repo: Repository, target: string): CommandResult {
+  if (conflictedFiles(repo).length > 0) {
+    return failure(repo, 'error: you need to resolve your current index first');
+  }
   const ref = `refs/heads/${target}`;
   const branchSha = repo.refs.get(ref);
 
@@ -188,6 +191,9 @@ export function gitCheckoutNewBranch(
   name: string,
   start?: string,
 ): CommandResult {
+  if (conflictedFiles(repo).length > 0) {
+    return failure(repo, 'error: you need to resolve your current index first');
+  }
   if (!isValidBranchName(name)) {
     return failure(repo, `fatal: '${name}' is not a valid branch name`);
   }

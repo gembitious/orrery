@@ -9,7 +9,13 @@ const COMMITTED = ['git init', 'echo hello > f.txt', 'git add f.txt', 'git commi
 describe('computeStatus — 3영역 비교', () => {
   it('깨끗한 상태', () => {
     const status = computeStatus(run(COMMITTED));
-    expect(status).toEqual({ branch: 'main', initial: false, entries: [], clean: true });
+    expect(status).toEqual({
+      branch: 'main',
+      initial: false,
+      merging: false,
+      entries: [],
+      clean: true,
+    });
   });
 
   it('untracked: working tree에만 있는 파일', () => {

@@ -44,6 +44,15 @@ export function failure(repo: Repository, error: string): CommandResult {
   return { repo, output: [], error, diff: emptyDiff() };
 }
 
+/** 엔트리의 내용 식별자 — 충돌 엔트리는 stage 조합으로 구분한다 */
+function indexSignature(entry: IndexEntry | undefined): string | undefined {
+  if (entry === undefined) return undefined;
+  if (entry.conflicted === true) {
+    return `conflict:${entry.stages[1] ?? ''}:${entry.stages[2] ?? ''}:${entry.stages[3] ?? ''}`;
+  }
+  return entry.sha;
+}
+
 /**
  * index/working tree를 통째로 교체하는 명령(checkout, reset)의 전후 차이를
  * StateDiff의 indexChanges/workingTreeChanges로 기록한다.
@@ -75,8 +84,8 @@ export function workspaceDiff(
       diff.workingTreeChanges.push({ file, kind: 'modified' });
     }
 
-    const idxBefore = before.index.get(file)?.sha;
-    const idxAfter = index.get(file)?.sha;
+    const idxBefore = indexSignature(before.index.get(file));
+    const idxAfter = indexSignature(index.get(file));
     if (idxBefore === undefined && idxAfter !== undefined) {
       diff.indexChanges.push({ file, kind: 'staged' });
     } else if (idxBefore !== undefined && idxAfter === undefined) {

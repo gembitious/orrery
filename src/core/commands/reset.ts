@@ -14,7 +14,7 @@
  */
 import { hashObject, shortSha } from '../objects';
 import type { IndexEntry, Repository } from '../repository';
-import { resolveHead } from '../repository';
+import { resolveHead, stagedSha } from '../repository';
 import type { CommandResult } from '../result';
 import { failure, success, workspaceDiff } from '../result';
 import { blobContent, commitTreeMap, getCommit, resolveRevision } from '../revision';
@@ -30,6 +30,9 @@ function unknownRevision(text: string): string {
 }
 
 export function gitReset(repo: Repository, mode: ResetMode, targetText: string): CommandResult {
+  if (mode === 'soft' && repo.merging !== undefined) {
+    return failure(repo, 'fatal: Cannot do a soft reset in the middle of a merge.');
+  }
   const headSha = resolveHead(repo);
   // unborn 상태에서는 'HEAD'조차 해석되지 않는다 — 실제 git도 같은 문구를 낸다
   if (headSha === undefined) return failure(repo, unknownRevision(targetText));
@@ -60,7 +63,8 @@ export function gitReset(repo: Repository, mode: ResetMode, targetText: string):
   }
 
   const diff = workspaceDiff(repo, index, workingTree);
-  const next: Repository = { ...repo, index, workingTree };
+  // mixed/hard reset은 진행 중인 머지도 정리한다 (MERGE_HEAD 제거 — 실제 git 동작)
+  const next: Repository = { ...repo, index, workingTree, merging: undefined };
 
   if (repo.head.kind === 'symbolic') {
     const refs = new Map(repo.refs);
@@ -85,12 +89,12 @@ export function gitReset(repo: Repository, mode: ResetMode, targetText: string):
     // 새 index와 WT의 차이를 실제 git처럼 'M/D <파일>'로 알린다 (untracked는 제외)
     const lines: string[] = [];
     for (const [name, entry] of [...index].sort(([a], [b]) => (a < b ? -1 : 1))) {
+      const sha = stagedSha(entry);
+      if (sha === undefined) continue; // reset 직후의 index는 전부 평시 엔트리다
       const content = workingTree.get(name);
       if (content === undefined) {
         lines.push(`D\t${name}`);
-      } else if (
-        entry.sha !== hashBlob(content)
-      ) {
+      } else if (sha !== hashBlob(content)) {
         lines.push(`M\t${name}`);
       }
     }

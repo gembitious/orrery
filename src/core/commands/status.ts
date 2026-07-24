@@ -12,11 +12,18 @@ import { computeStatus } from '../status';
 // 실제 git처럼 파일명이 정렬되도록 라벨 뒤 공백을 맞춘다
 const INDEX_LABEL = { added: 'new file:   ', modified: 'modified:   ', deleted: 'deleted:    ' };
 const WORKTREE_LABEL = { modified: 'modified:   ', deleted: 'deleted:    ' };
+const UNMERGED_LABEL = {
+  'both modified': 'both modified:   ',
+  'both added': 'both added:      ',
+  'deleted by us': 'deleted by us:   ',
+  'deleted by them': 'deleted by them: ',
+};
 
 function renderSections(status: RepoStatus): string[] {
   const staged = status.entries.filter((e): e is StatusEntry & { index: string } =>
     e.index !== undefined,
   );
+  const unmerged = status.entries.filter((e) => e.unmerged !== undefined);
   const unstaged = status.entries.filter(
     (e) => e.worktree === 'modified' || e.worktree === 'deleted',
   );
@@ -26,13 +33,32 @@ function renderSections(status: RepoStatus): string[] {
 
   if (staged.length > 0) {
     lines.push('Changes to be committed:');
-    lines.push(
-      status.initial
-        ? '  (use "git rm --cached <file>..." to unstage)'
-        : '  (use "git restore --staged <file>..." to unstage)',
-    );
+    // 머지 중에는 실제 git도 unstage 힌트를 생략한다
+    if (!status.merging) {
+      lines.push(
+        status.initial
+          ? '  (use "git rm --cached <file>..." to unstage)'
+          : '  (use "git restore --staged <file>..." to unstage)',
+      );
+    }
     for (const e of staged) {
       if (e.index !== undefined) lines.push(`\t${INDEX_LABEL[e.index]}${e.file}`);
+    }
+    lines.push('');
+  }
+
+  if (unmerged.length > 0) {
+    lines.push('Unmerged paths:');
+    const hasDeleteConflict = unmerged.some(
+      (e) => e.unmerged === 'deleted by us' || e.unmerged === 'deleted by them',
+    );
+    lines.push(
+      hasDeleteConflict
+        ? '  (use "git add/rm <file>..." as appropriate to mark resolution)'
+        : '  (use "git add <file>..." to mark resolution)',
+    );
+    for (const e of unmerged) {
+      if (e.unmerged !== undefined) lines.push(`\t${UNMERGED_LABEL[e.unmerged]}${e.file}`);
     }
     lines.push('');
   }
@@ -58,7 +84,9 @@ function renderSections(status: RepoStatus): string[] {
 
   // 마지막 요약 줄 — staged가 있으면 요약 없이 끝난다 (실제 git과 동일)
   if (staged.length === 0) {
-    if (unstaged.length > 0) {
+    if (unmerged.length > 0) {
+      lines.push('no changes added to commit (use "git add" and/or "git commit -a")');
+    } else if (unstaged.length > 0) {
       lines.push('no changes added to commit (use "git add" and/or "git commit -a")');
     } else if (untracked.length > 0) {
       lines.push('nothing added to commit but untracked files present (use "git add" to track)');
@@ -85,6 +113,18 @@ export function gitStatus(repo: Repository): CommandResult {
   }
   if (status.initial) {
     lines.push('', 'No commits yet', '');
+  }
+  if (status.merging) {
+    const unresolved = status.entries.some((e) => e.unmerged !== undefined);
+    if (unresolved) {
+      lines.push('You have unmerged paths.');
+      lines.push('  (fix conflicts and run "git commit")');
+      lines.push('  (use "git merge --abort" to abort the merge)');
+    } else {
+      lines.push('All conflicts fixed but you are still merging.');
+      lines.push('  (use "git commit" to conclude merge)');
+    }
+    lines.push('');
   }
   lines.push(...renderSections(status));
 

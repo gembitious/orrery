@@ -238,6 +238,24 @@ svg [data-flip-key] {
 .badge-modified { background: var(--badge-modified); }
 .badge-untracked { background: var(--badge-untracked); }
 .badge-deleted { background: var(--badge-deleted); }
+.badge-conflicted { background: var(--badge-deleted); }
+
+.cell-conflict {
+  background: color-mix(in srgb, var(--badge-deleted) 8%, transparent);
+}
+.stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.stage-n {
+  font-size: 10px;
+  color: var(--badge-deleted);
+  border: 1px solid var(--badge-deleted);
+  border-radius: 2px;
+  padding: 0 3px;
+  line-height: 1.4;
+}
 
 /* ── 터미널 ───────────────────────────────────── */
 .terminal {

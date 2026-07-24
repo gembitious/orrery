@@ -16,7 +16,7 @@
 import type { GitObject, Sha, TreeEntry } from '../objects';
 import { hashObject, shortSha } from '../objects';
 import type { IndexEntry, Repository } from '../repository';
-import { resolveHead } from '../repository';
+import { conflictedFiles, resolveHead, stagedSha } from '../repository';
 import type { CommandResult, StateDiff } from '../result';
 import { emptyDiff, failure, success, workspaceDiff } from '../result';
 import { blobContent, commitTreeMap, getCommit } from '../revision';
@@ -46,6 +46,14 @@ function store(objects: Map<Sha, GitObject>, diff: StateDiff, obj: GitObject): S
 }
 
 export function gitStash(repo: Repository): CommandResult {
+  const conflicts = conflictedFiles(repo);
+  if (conflicts.length > 0) {
+    return failure(
+      repo,
+      `${conflicts.map((f) => `${f}: needs merge`).join('\n')}\n` +
+        'fatal: git-write-tree: error building trees\nCannot save the current index state',
+    );
+  }
   const headSha = resolveHead(repo);
   if (headSha === undefined) {
     return failure(repo, 'You do not have the initial commit yet');
@@ -68,11 +76,12 @@ export function gitStash(repo: Repository): CommandResult {
   const diff = emptyDiff();
 
   // ① index 커밋: 지금 staged된 스냅샷
-  const indexTreeSha = store(
-    objects,
-    diff,
-    treeFromMap(new Map([...repo.index].map(([name, e]) => [name, e.sha]))),
-  );
+  const indexEntryMap = new Map<string, Sha>();
+  for (const [name, e] of repo.index) {
+    const sha = stagedSha(e);
+    if (sha !== undefined) indexEntryMap.set(name, sha); // 충돌은 위에서 걸러졌다
+  }
+  const indexTreeSha = store(objects, diff, treeFromMap(indexEntryMap));
   const indexSig = { name: AUTHOR_NAME, email: AUTHOR_EMAIL, timestamp: repo.clock + 1 };
   const indexCommitSha = store(objects, diff, {
     type: 'commit',
@@ -128,6 +137,9 @@ export function gitStash(repo: Repository): CommandResult {
 }
 
 export function gitStashPop(repo: Repository): CommandResult {
+  if (conflictedFiles(repo).length > 0) {
+    return failure(repo, 'orrery: 충돌(unmerged) 상태에서는 stash pop을 지원하지 않습니다');
+  }
   const wipSha = repo.stashes[0];
   if (wipSha === undefined) {
     return failure(repo, 'No stash entries found.');

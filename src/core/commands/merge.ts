@@ -13,7 +13,7 @@
 import type { GitObject, Sha, TreeEntry } from '../objects';
 import { hashObject, shortSha } from '../objects';
 import type { Head, IndexEntry, Repository } from '../repository';
-import { resolveHead } from '../repository';
+import { conflictedFiles, resolveHead } from '../repository';
 import type { CommandResult } from '../result';
 import { emptyDiff, failure, success, workspaceDiff } from '../result';
 import { blobContent, commitTreeMap, getCommit, isAncestor, resolveRevision } from '../revision';
@@ -44,7 +44,50 @@ function mergeBase(repo: Repository, a: Sha, b: Sha): Sha | undefined {
   return undefined;
 }
 
+/**
+ * `git merge --abort` — 머지 이전 상태로 복귀.
+ * SIMPLIFIED: index/WT를 HEAD로 되돌린다 (untracked는 보존). 머지 전에 있던
+ * 무관한 unstaged 변경까지는 복원하지 못한다 (orrery는 머지 전 스냅샷을 안 남긴다).
+ */
+export function gitMergeAbort(repo: Repository): CommandResult {
+  if (repo.merging === undefined) {
+    return failure(repo, 'fatal: There is no merge to abort (MERGE_HEAD missing).');
+  }
+  const headSha = resolveHead(repo);
+  if (headSha === undefined) {
+    throw new Error('orrery 내부 오류: 머지 중인데 HEAD가 unborn입니다');
+  }
+  const headTree = commitTreeMap(repo, headSha);
+  const index = new Map<string, IndexEntry>(
+    [...headTree].map(([name, sha]) => [name, { name, sha }]),
+  );
+  const workingTree = new Map<string, string>();
+  for (const [name, sha] of headTree) workingTree.set(name, blobContent(repo, sha));
+  for (const [name, content] of repo.workingTree) {
+    if (!repo.index.has(name) && !headTree.has(name)) workingTree.set(name, content);
+  }
+
+  const diff = workspaceDiff(repo, index, workingTree);
+  return success({ ...repo, index, workingTree, merging: undefined }, [], diff);
+}
+
 export function gitMerge(repo: Repository, targetText: string): CommandResult {
+  if (conflictedFiles(repo).length > 0) {
+    return failure(
+      repo,
+      'error: Merging is not possible because you have unmerged files.\n' +
+        "hint: Fix them up in the work tree, and then use 'git add/rm <file>'\n" +
+        'hint: as appropriate to mark resolution and make a commit.\n' +
+        'fatal: Exiting because of an unresolved conflict.',
+    );
+  }
+  if (repo.merging !== undefined) {
+    return failure(
+      repo,
+      'fatal: You have not concluded your merge (MERGE_HEAD exists).\n' +
+        'Please, commit your changes before you merge.',
+    );
+  }
   const headSha = resolveHead(repo);
   const target = headSha === undefined ? undefined : resolveRevision(repo, targetText);
   if (headSha === undefined || target === undefined) {
@@ -119,26 +162,89 @@ export function gitMerge(repo: Repository, targetText: string): CommandResult {
     }
   }
 
-  if (conflicts.length > 0) {
-    return failure(
-      repo,
-      `${conflicts.map((f) => `Auto-merging ${f}\nCONFLICT (content): Merge conflict in ${f}`).join('\n')}\n` +
-        'Automatic merge failed; fix conflicts and then commit the result.\n' +
-        '(orrery: 충돌 상태 모델링은 4.2에서 지원 예정 — 지금은 merge가 중단됩니다)',
-    );
-  }
-
-  // 머지가 실제로 바꿀 파일에 로컬(unstaged/untracked) 변경이 있으면 거부
+  // 머지가 실제로 바꿀 파일(충돌 파일 포함)에 로컬 변경이 있으면 거부
   const statusByFile = new Map(status.entries.map((e) => [e.file, e]));
   const changedFiles = files.filter((f) => merged.get(f) !== oursTree.get(f));
-  const blocked = changedFiles.filter((f) => statusByFile.has(f));
+  const blocked = [...new Set([...changedFiles, ...conflicts])].filter((f) => statusByFile.has(f));
   if (blocked.length > 0) {
     return failure(
       repo,
       'error: Your local changes to the following files would be overwritten by merge:\n' +
-        `${blocked.map((f) => `\t${f}`).join('\n')}\n` +
+        `${blocked.sort().map((f) => `\t${f}`).join('\n')}\n` +
         'Please commit your changes or stash them before you merge.\nAborting',
     );
+  }
+
+  const subjectText = repo.refs.has(`refs/heads/${targetText}`)
+    ? `Merge branch '${targetText}'`
+    : `Merge commit '${targetText}'`;
+  const intoBranch =
+    repo.head.kind === 'symbolic' ? repo.head.ref.replace(/^refs\/heads\//, '') : undefined;
+  const mergeMessage =
+    intoBranch !== undefined && intoBranch !== 'main'
+      ? `${subjectText} into ${intoBranch}`
+      : subjectText;
+
+  // ── 충돌: 저장소가 "머지 중" 상태가 된다 ─────────
+  if (conflicts.length > 0) {
+    const index = new Map(repo.index);
+    const workingTree = new Map(repo.workingTree);
+
+    // 깨끗하게 합쳐진 파일들은 평시대로 index+WT에 반영된다
+    for (const file of changedFiles) {
+      if (conflicts.includes(file)) continue;
+      const sha = merged.get(file);
+      if (sha === undefined) {
+        index.delete(file);
+        workingTree.delete(file);
+      } else {
+        index.set(file, { name: file, sha });
+        workingTree.set(file, blobContent(repo, sha));
+      }
+    }
+
+    const output: string[] = [];
+    for (const file of conflicts) {
+      const base = baseTree.get(file);
+      const ours = oursTree.get(file);
+      const theirs = theirsTree.get(file);
+      // index: stage 1/2/3 — 비어 있는 stage가 곧 충돌의 종류를 말한다
+      const stages: { 1?: Sha; 2?: Sha; 3?: Sha } = {};
+      if (base !== undefined) stages[1] = base;
+      if (ours !== undefined) stages[2] = ours;
+      if (theirs !== undefined) stages[3] = theirs;
+      index.set(file, { name: file, conflicted: true, stages });
+
+      if (ours !== undefined && theirs !== undefined) {
+        // 내용 충돌: working tree에 실제 충돌 마커를 쓴다
+        workingTree.set(
+          file,
+          `<<<<<<< HEAD\n${blobContent(repo, ours)}\n=======\n${blobContent(repo, theirs)}\n>>>>>>> ${targetText}`,
+        );
+        output.push(`Auto-merging ${file}`, `CONFLICT (content): Merge conflict in ${file}`);
+      } else {
+        // modify/delete: 남아 있는 쪽의 버전이 working tree에 남는다
+        const deletedIn = ours === undefined ? 'HEAD' : targetText;
+        const modifiedIn = ours === undefined ? targetText : 'HEAD';
+        const kept = ours ?? theirs;
+        if (kept !== undefined) workingTree.set(file, blobContent(repo, kept));
+        output.push(
+          `CONFLICT (modify/delete): ${file} deleted in ${deletedIn} and modified in ${modifiedIn}.  ` +
+            `Version ${modifiedIn} of ${file} left in tree.`,
+        );
+      }
+    }
+    output.push('Automatic merge failed; fix conflicts and then commit the result.');
+
+    const diff = workspaceDiff(repo, index, workingTree);
+    const next: Repository = {
+      ...repo,
+      index,
+      workingTree,
+      merging: { theirs: target, message: mergeMessage },
+    };
+    // 상태가 실제로 변했으므로 실패가 아니라 성공이다 (실제 git도 exit 1일 뿐 상태는 남는다)
+    return success(next, output, diff);
   }
 
   // 머지 커밋 생성
@@ -152,11 +258,6 @@ export function gitMerge(repo: Repository, targetText: string): CommandResult {
     diff.createdObjects.push(treeSha);
   }
 
-  const currentBranch =
-    repo.head.kind === 'symbolic' ? repo.head.ref.replace(/^refs\/heads\//, '') : undefined;
-  const isBranch = repo.refs.has(`refs/heads/${targetText}`);
-  const subject = isBranch ? `Merge branch '${targetText}'` : `Merge commit '${targetText}'`;
-  const into = currentBranch !== undefined && currentBranch !== 'main' ? ` into ${currentBranch}` : '';
   const timestamp = repo.clock + 1;
   const signature = { name: AUTHOR_NAME, email: AUTHOR_EMAIL, timestamp };
   const commit: GitObject = {
@@ -165,7 +266,7 @@ export function gitMerge(repo: Repository, targetText: string): CommandResult {
     parents: [headSha, target], // 부모 2개 — 이것이 머지 커밋의 정의다
     author: signature,
     committer: signature,
-    message: `${subject}${into}\n`,
+    message: `${mergeMessage}\n`,
   };
   const commitSha = hashObject(commit);
   objects.set(commitSha, commit);

@@ -118,7 +118,7 @@ describe('3-way merge', () => {
     expect(result.repo.workingTree.get('f.txt')).toBe('agreed');
   });
 
-  it('양쪽이 서로 다르게 바꾸면 CONFLICT로 중단 (상태 불변)', () => {
+  it('양쪽이 서로 다르게 바꾸면 CONFLICT — 머지 중 상태가 된다 (상세는 conflict.test.ts)', () => {
     const repo = run([
       ...BASE,
       'git checkout -b clash',
@@ -127,10 +127,10 @@ describe('3-way merge', () => {
       'echo B > f.txt', 'git add .', 'git commit -m cb',
     ]);
     const result = execute(repo, 'git merge clash');
-    expect(result.error).toContain('Auto-merging f.txt');
-    expect(result.error).toContain('CONFLICT (content): Merge conflict in f.txt');
-    expect(result.error).toContain('Automatic merge failed; fix conflicts and then commit the result.');
-    expect(result.repo).toBe(repo);
+    expect(result.error).toBeUndefined();
+    expect(result.output).toContain('CONFLICT (content): Merge conflict in f.txt');
+    expect(result.repo.merging).toBeDefined();
+    expect(result.repo.index.get('f.txt')?.conflicted).toBe(true);
   });
 
   it('staged 변경이 있으면 ort 전략 거부', () => {
