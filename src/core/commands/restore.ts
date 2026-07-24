@@ -20,6 +20,10 @@ export function gitRestoreWorktree(repo: Repository, pathspecs: string[]): Comma
   const seen = new Set<string>();
   for (const spec of pathspecs) {
     const expanded = spec === '.' ? [...repo.index.keys()] : [spec];
+    if (expanded.length === 0) {
+      // '.'이 아무것도 매칭하지 못하면 실제 git도 pathspec 에러다
+      return failure(repo, `error: pathspec '${spec}' did not match any file(s) known to git`);
+    }
     for (const name of expanded) {
       if (!seen.has(name)) {
         seen.add(name);
@@ -59,6 +63,9 @@ export function gitRestoreStaged(repo: Repository, pathspecs: string[]): Command
   const seen = new Set<string>();
   for (const spec of pathspecs) {
     const expanded = spec === '.' ? [...new Set([...repo.index.keys(), ...headTree.keys()])] : [spec];
+    if (expanded.length === 0) {
+      return failure(repo, `error: pathspec '${spec}' did not match any file(s) known to git`);
+    }
     for (const name of expanded) {
       if (!seen.has(name)) {
         seen.add(name);

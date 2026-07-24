@@ -53,6 +53,12 @@ describe('git restore <file> — WT ← index', () => {
     expect(execute(stagedDel, 'git restore f.txt').error).toMatch(/pathspec 'f.txt'/);
   });
 
+  it("index가 비어 있으면 '.'도 pathspec 에러 (실제 git과 동일)", () => {
+    expect(execute(run(['git init']), 'git restore .').error).toBe(
+      "error: pathspec '.' did not match any file(s) known to git",
+    );
+  });
+
   it('unborn 저장소에서도 index만 있으면 동작한다', () => {
     const repo = run(['git init', 'echo a > a.txt', 'git add a.txt', 'echo b > a.txt']);
     const result = execute(repo, 'git restore a.txt');
