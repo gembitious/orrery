@@ -15,14 +15,17 @@ import { blobContent, commitTreeMap, getCommit, resolveCommitish } from '../revi
 import { computeStatus } from '../status';
 import { isValidBranchName } from './branch';
 
-interface SwitchPlan {
+export interface SwitchPlan {
   index: Map<string, IndexEntry>;
   workingTree: Map<string, string>;
   error?: string;
 }
 
-/** 대상 커밋으로 전환했을 때의 index/working tree를 계산한다 (충돌이면 error) */
-function planSwitch(repo: Repository, targetSha: string): SwitchPlan {
+/**
+ * 대상 커밋으로 전환했을 때의 index/working tree를 계산한다 (충돌이면 error).
+ * checkout뿐 아니라 fast-forward merge도 같은 규칙을 쓴다.
+ */
+export function planSwitch(repo: Repository, targetSha: string): SwitchPlan {
   const headSha = resolveHead(repo);
   const currentTree = headSha === undefined ? new Map() : commitTreeMap(repo, headSha);
   const targetTree = commitTreeMap(repo, targetSha);

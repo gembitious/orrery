@@ -161,7 +161,7 @@ interface StateDiff {
 
 ### Phase 4 — 히스토리 조작
 
-- [ ] 4.1 `git merge`: fast-forward / 3-way 구분, merge commit (parents 2개)
+- [x] 4.1 `git merge`: fast-forward / 3-way 구분, merge commit (parents 2개)
 - [ ] 4.2 충돌 상태 모델링: conflicted index (stage 1/2/3 단순화 가능), 충돌 마커가 든 working tree 파일, `git add` → `git commit`으로 해소하는 플로우
 - [ ] 4.3 `git rebase <branch>`: 커밋 재적용, 원본 커밋과 새 커밋의 관계 시각화 (재적용 시 해시가 바뀐다는 것이 눈에 보여야 함)
 - [ ] 4.4 `git cherry-pick`
