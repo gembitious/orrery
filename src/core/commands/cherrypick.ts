@@ -14,13 +14,12 @@ import { hashObject, shortSha } from '../objects';
 import type { Repository } from '../repository';
 import { resolveHead } from '../repository';
 import type { CommandResult } from '../result';
-import { emptyDiff, failure, success } from '../result';
+import { emptyDiff, failure, success, workspaceDiff } from '../result';
 import { threeWayTrees } from '../merge3';
 import { blobContent, commitTreeMap, getCommit, resolveRevision } from '../revision';
 import { AUTHOR_EMAIL, AUTHOR_NAME } from './commit';
 import { formatDate } from './log';
 import { dirtyStateError } from './rebase';
-import { workspaceDiff } from '../result';
 
 export function gitCherryPick(repo: Repository, targetText: string): CommandResult {
   const headSha = resolveHead(repo);
