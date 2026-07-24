@@ -94,6 +94,7 @@ interface Repository {
   head: Head;
   index: Map<string, IndexEntry>; // filename → entry
   workingTree: Map<string, string>; // filename → content
+  stashes: Sha[];                 // stash 스택 (WIP 커밋 sha, [0]이 최신) — reflog 대체
   clock: number;                  // 시뮬레이션 시계
 }
 ```
@@ -155,7 +156,7 @@ interface StateDiff {
 
 - [x] 3.1 `git reset --soft/--mixed/--hard [<commit>]`: HEAD~N, 해시 지정. 세 모드가 3영역에 미치는 영향 차이가 애니메이션으로 명확히 보여야 한다
 - [x] 3.2 `git restore <file>` / `git restore --staged <file>`
-- [ ] 3.3 `git stash` / `stash pop` / `stash list`: stash가 실제로는 커밋(WIP + index 커밋)이라는 것을 그래프에 노출할지 여부는 토글로 (기본: 노출 — 이게 orrery의 존재 이유)
+- [x] 3.3 `git stash` / `stash pop` / `stash list`: stash가 실제로는 커밋(WIP + index 커밋)이라는 것을 그래프에 노출할지 여부는 토글로 (기본: 노출 — 이게 orrery의 존재 이유)
 - [ ] 3.4 `git rm --cached`, `git commit --amend`
 
 ### Phase 4 — 히스토리 조작

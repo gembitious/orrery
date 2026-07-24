@@ -12,6 +12,7 @@ import { gitLog } from '../core/commands/log';
 import type { ResetMode } from '../core/commands/reset';
 import { gitReset } from '../core/commands/reset';
 import { gitRestoreStaged, gitRestoreWorktree } from '../core/commands/restore';
+import { gitStash, gitStashList, gitStashPop } from '../core/commands/stash';
 import { gitStatus } from '../core/commands/status';
 import type { Repository } from '../core/repository';
 import type { CommandResult } from '../core/result';
@@ -83,6 +84,16 @@ function executeGit(repo: Repository, args: Token[]): CommandResult {
       return parseReset(repo, rest);
     case 'restore':
       return parseRestore(repo, rest);
+    case 'stash': {
+      if (rest.length === 0) return gitStash(repo);
+      const sub2 = rest[0].value;
+      if (rest.length === 1 && sub2 === 'pop') return gitStashPop(repo);
+      if (rest.length === 1 && sub2 === 'list') return gitStashList(repo);
+      return failure(
+        repo,
+        `orrery: 'git stash ${sub2}'은(는) 아직 지원하지 않습니다 (지원: stash / pop / list)`,
+      );
+    }
     case 'status': {
       if (rest.length > 0) {
         return failure(

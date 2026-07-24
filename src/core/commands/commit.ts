@@ -16,8 +16,8 @@ import { emptyDiff, failure, success } from '../result';
 import { computeStatus } from '../status';
 
 // SIMPLIFIED: config(user.name/user.email)가 없으므로 고정 identity를 쓴다
-const AUTHOR_NAME = 'Orrery';
-const AUTHOR_EMAIL = 'orrery@example.com';
+export const AUTHOR_NAME = 'Orrery';
+export const AUTHOR_EMAIL = 'orrery@example.com';
 
 /** index == HEAD tree일 때, 실제 git이 내는 세 갈래의 "커밋할 것 없음" 문구 */
 function nothingToCommitError(repo: Repository, isInitial: boolean): string {

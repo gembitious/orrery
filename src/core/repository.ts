@@ -24,6 +24,12 @@ export interface Repository {
   head: Head;
   index: Map<string, IndexEntry>; // filename → entry
   workingTree: Map<string, string>; // filename → content (flat FS, '/' 금지)
+  /**
+   * stash 스택 — 각 원소는 WIP 커밋의 sha, [0]이 최신(stash@{0}).
+   * SIMPLIFIED: 실제 git은 refs/stash + reflog로 스택을 만들지만
+   * reflog가 스코프 아웃이므로 배열로 직접 모델링한다.
+   */
+  stashes: Sha[];
   clock: number; // 시뮬레이션 시계 (커밋 타임스탬프용 단조 증가 카운터)
 }
 
@@ -41,6 +47,7 @@ export function createRepository(): Repository {
     head: { kind: 'symbolic', ref: 'refs/heads/main' },
     index: new Map(),
     workingTree: new Map(),
+    stashes: [],
     clock: 0,
   };
 }
