@@ -12,11 +12,12 @@
 import type { Sha } from './objects';
 import { hashObject } from './objects';
 import type { Repository } from './repository';
-import { resolveHead } from './repository';
+import { resolveHead, stagedSha } from './repository';
 import { commitTreeMap } from './revision';
 
 export type IndexState = 'added' | 'modified' | 'deleted';
 export type WorktreeState = 'modified' | 'deleted' | 'untracked';
+export type UnmergedState = 'both modified' | 'both added' | 'deleted by us' | 'deleted by them';
 
 export interface StatusEntry {
   file: string;
@@ -24,6 +25,8 @@ export interface StatusEntry {
   index?: IndexState;
   /** working tree vs index. 없으면 undefined */
   worktree?: WorktreeState;
+  /** 머지 충돌(unmerged) — 이게 있으면 index/worktree 배지는 계산하지 않는다 */
+  unmerged?: UnmergedState;
 }
 
 export interface RepoStatus {
@@ -33,6 +36,8 @@ export interface RepoStatus {
   detachedAt?: Sha;
   /** 커밋이 하나도 없는 상태 (unborn branch) */
   initial: boolean;
+  /** 머지 진행 중 (MERGE_HEAD 존재) */
+  merging: boolean;
   /** 변경이 있는 파일만, 이름순 정렬 */
   entries: StatusEntry[];
   clean: boolean;
@@ -52,8 +57,24 @@ export function computeStatus(repo: Repository): RepoStatus {
 
   const entries: StatusEntry[] = [];
   for (const file of files) {
+    const entry = repo.index.get(file);
+    if (entry?.conflicted === true) {
+      // 어떤 stage가 비었는지가 곧 충돌의 종류다
+      const s = entry.stages;
+      const unmerged: UnmergedState =
+        s[2] !== undefined && s[3] !== undefined
+          ? s[1] !== undefined
+            ? 'both modified'
+            : 'both added'
+          : s[2] === undefined
+            ? 'deleted by us'
+            : 'deleted by them';
+      entries.push({ file, unmerged });
+      continue;
+    }
+
     const inHead = headTree.get(file);
-    const inIndex = repo.index.get(file)?.sha;
+    const inIndex = stagedSha(entry);
     const wtContent = repo.workingTree.get(file);
     // working tree 내용을 blob으로 해싱해 index와 비교 — add를 실제로 하지 않고도
     // "add하면 이 sha가 될 것"을 아는 것. SIMPLIFIED: 실제 git은 stat 캐시로
@@ -86,8 +107,9 @@ export function computeStatus(repo: Repository): RepoStatus {
 
   const status: RepoStatus = {
     initial: resolveHead(repo) === undefined,
+    merging: repo.merging !== undefined,
     entries,
-    clean: entries.length === 0,
+    clean: entries.length === 0 && repo.merging === undefined,
   };
   if (repo.head.kind === 'symbolic') {
     status.branch = repo.head.ref.replace(/^refs\/heads\//, '');

@@ -8,21 +8,24 @@
  */
 import { hashObject, shortSha } from '../objects';
 import type { Head, IndexEntry, Repository } from '../repository';
-import { resolveHead } from '../repository';
+import { conflictedFiles, resolveHead } from '../repository';
 import type { CommandResult, StateDiff } from '../result';
 import { emptyDiff, failure, success, workspaceDiff } from '../result';
 import { blobContent, commitTreeMap, getCommit, resolveCommitish } from '../revision';
 import { computeStatus } from '../status';
 import { isValidBranchName } from './branch';
 
-interface SwitchPlan {
+export interface SwitchPlan {
   index: Map<string, IndexEntry>;
   workingTree: Map<string, string>;
   error?: string;
 }
 
-/** 대상 커밋으로 전환했을 때의 index/working tree를 계산한다 (충돌이면 error) */
-function planSwitch(repo: Repository, targetSha: string): SwitchPlan {
+/**
+ * 대상 커밋으로 전환했을 때의 index/working tree를 계산한다 (충돌이면 error).
+ * checkout뿐 아니라 fast-forward merge도 같은 규칙을 쓴다.
+ */
+export function planSwitch(repo: Repository, targetSha: string): SwitchPlan {
   const headSha = resolveHead(repo);
   const currentTree = headSha === undefined ? new Map() : commitTreeMap(repo, headSha);
   const targetTree = commitTreeMap(repo, targetSha);
@@ -132,6 +135,9 @@ function diffFromPlan(repo: Repository, plan: SwitchPlan): StateDiff {
 }
 
 export function gitCheckout(repo: Repository, target: string): CommandResult {
+  if (conflictedFiles(repo).length > 0) {
+    return failure(repo, 'error: you need to resolve your current index first');
+  }
   const ref = `refs/heads/${target}`;
   const branchSha = repo.refs.get(ref);
 
@@ -185,6 +191,9 @@ export function gitCheckoutNewBranch(
   name: string,
   start?: string,
 ): CommandResult {
+  if (conflictedFiles(repo).length > 0) {
+    return failure(repo, 'error: you need to resolve your current index first');
+  }
   if (!isValidBranchName(name)) {
     return failure(repo, `fatal: '${name}' is not a valid branch name`);
   }

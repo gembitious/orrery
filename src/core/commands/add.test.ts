@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '../../command/execute';
+import { stagedSha } from '../repository';
 import { run } from '../../command/run';
 
 // 실제 git: printf 'hello' | git hash-object --stdin
@@ -27,7 +28,7 @@ describe('git add <file>', () => {
 
   it('add는 그 시점의 스냅샷 — add 후 수정해도 index는 이전 blob을 가리킨다', () => {
     const repo = run(['git init', 'echo hello > f.txt', 'git add f.txt', 'echo v2 > f.txt']);
-    expect(repo.index.get('f.txt')?.sha).toBe(BLOB_HELLO);
+    expect(stagedSha(repo.index.get('f.txt'))).toBe(BLOB_HELLO);
     expect(repo.workingTree.get('f.txt')).toBe('v2');
   });
 
@@ -35,7 +36,7 @@ describe('git add <file>', () => {
     const before = run(['git init', 'echo hello > f.txt', 'git add f.txt', 'echo v2 > f.txt']);
     const result = execute(before, 'git add f.txt');
 
-    const newSha = result.repo.index.get('f.txt')?.sha;
+    const newSha = stagedSha(result.repo.index.get('f.txt'));
     expect(newSha).not.toBe(BLOB_HELLO);
     expect(result.diff.indexChanges).toEqual([{ file: 'f.txt', kind: 'modified' }]);
     // git은 대체된 loose object를 지우지 않는다
@@ -44,8 +45,8 @@ describe('git add <file>', () => {
 
   it('내용이 같은 두 파일은 blob 하나를 공유한다 (content-addressed)', () => {
     const repo = run(['git init', 'echo hello > a.txt', 'echo hello > b.txt', 'git add a.txt b.txt']);
-    expect(repo.index.get('a.txt')?.sha).toBe(BLOB_HELLO);
-    expect(repo.index.get('b.txt')?.sha).toBe(BLOB_HELLO);
+    expect(stagedSha(repo.index.get('a.txt'))).toBe(BLOB_HELLO);
+    expect(stagedSha(repo.index.get('b.txt'))).toBe(BLOB_HELLO);
     expect(repo.objects.size).toBe(1);
   });
 

@@ -43,6 +43,10 @@ export function gitRestoreWorktree(repo: Repository, pathspecs: string[]): Comma
   for (const name of names) {
     const entry = repo.index.get(name);
     if (entry === undefined) continue;
+    if (entry.conflicted === true) {
+      // 실제 git: 충돌 중인 파일은 index에 "하나의 버전"이 없으므로 복원 불가
+      return failure(repo, `error: path '${name}' is unmerged`);
+    }
     const content = blobContent(repo, entry.sha);
     if (repo.workingTree.get(name) !== content) workingTree.set(name, content);
   }

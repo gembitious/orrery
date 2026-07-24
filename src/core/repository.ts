@@ -11,9 +11,27 @@ export type Head =
   | { kind: 'symbolic'; ref: string } // 'refs/heads/main' — 브랜치를 가리킴
   | { kind: 'detached'; sha: Sha }; // 커밋을 직접 가리킴
 
-export interface IndexEntry {
-  name: string;
-  sha: Sha; // staged blob
+/**
+ * index 엔트리 — 평시에는 staged blob 하나(stage 0에 해당),
+ * 머지 충돌 중에는 세 버전이 stage 번호로 공존한다 (실제 git과 동일):
+ *   stage 1 = 공통 조상(base), stage 2 = 우리 쪽(ours), stage 3 = 그쪽(theirs)
+ * add/add 충돌이면 1이 없고, 한쪽 삭제 충돌이면 2 또는 3이 없다.
+ */
+export type IndexEntry =
+  | { name: string; conflicted?: false; sha: Sha }
+  | { name: string; conflicted: true; stages: { 1?: Sha; 2?: Sha; 3?: Sha } };
+
+/** 평시(stage 0) 엔트리의 sha. 충돌 엔트리면 undefined */
+export function stagedSha(entry: IndexEntry | undefined): Sha | undefined {
+  return entry !== undefined && entry.conflicted !== true ? entry.sha : undefined;
+}
+
+/** 충돌(unmerged) 상태인 파일 이름들 (이름순) */
+export function conflictedFiles(repo: Repository): string[] {
+  return [...repo.index.values()]
+    .filter((e) => e.conflicted === true)
+    .map((e) => e.name)
+    .sort();
 }
 
 export interface Repository {
@@ -30,6 +48,11 @@ export interface Repository {
    * reflog가 스코프 아웃이므로 배열로 직접 모델링한다.
    */
   stashes: Sha[];
+  /**
+   * 진행 중인 머지 — 실제 git의 MERGE_HEAD + MERGE_MSG에 해당.
+   * 충돌 해소 후 git commit이 이것을 소비해 부모 2개 커밋을 만든다.
+   */
+  merging?: { theirs: Sha; message: string };
   clock: number; // 시뮬레이션 시계 (커밋 타임스탬프용 단조 증가 카운터)
 }
 

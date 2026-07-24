@@ -9,7 +9,7 @@
 import type { GitObject, TreeEntry } from '../objects';
 import { hashObject, shortSha } from '../objects';
 import type { Repository } from '../repository';
-import { resolveHead } from '../repository';
+import { conflictedFiles, resolveHead, stagedSha } from '../repository';
 import { getCommit } from '../revision';
 import { formatDate } from './log';
 import type { CommandResult } from '../result';
@@ -33,37 +33,60 @@ function nothingToCommitError(repo: Repository, isInitial: boolean): string {
     : 'nothing to commit, working tree clean';
 }
 
-export function gitCommit(repo: Repository, rawMessage: string): CommandResult {
-  if (rawMessage.trim() === '') {
+/** repo.index를 tree 객체로 (충돌 엔트리가 없다는 전제 하에) */
+function indexToTree(repo: Repository): GitObject {
+  const entries: TreeEntry[] = [];
+  for (const e of repo.index.values()) {
+    const sha = stagedSha(e);
+    if (sha !== undefined) entries.push({ mode: '100644', name: e.name, sha });
+  }
+  return { type: 'tree', entries };
+}
+
+/** rawMessage가 없으면 진행 중인 머지의 메시지(MERGE_MSG)를 쓴다 */
+export function gitCommit(repo: Repository, rawMessage?: string): CommandResult {
+  if (conflictedFiles(repo).length > 0) {
+    return failure(
+      repo,
+      'error: Committing is not possible because you have unmerged files.\n' +
+        "hint: Fix them up in the work tree, and then use 'git add/rm <file>'\n" +
+        'hint: as appropriate to mark resolution and make a commit.\n' +
+        'fatal: Exiting because of an unresolved conflict.',
+    );
+  }
+  const raw = rawMessage ?? repo.merging?.message;
+  if (raw === undefined || raw.trim() === '') {
     return failure(repo, 'Aborting commit due to empty commit message.');
   }
   // git의 기본 cleanup처럼 끝 개행을 정리하고 정확히 하나만 남긴다
-  const message = `${rawMessage.replace(/\n+$/, '')}\n`;
+  const message = `${raw.replace(/\n+$/, '')}\n`;
 
   const headSha = resolveHead(repo);
 
-  // index → tree 객체
-  const entries: TreeEntry[] = [...repo.index.values()].map((e) => ({
-    mode: '100644',
-    name: e.name,
-    sha: e.sha,
-  }));
-  const tree: GitObject = { type: 'tree', entries };
+  const tree = indexToTree(repo);
   const treeSha = hashObject(tree);
 
-  // 커밋할 것 없음 판정
-  if (headSha === undefined) {
-    if (repo.index.size === 0) return failure(repo, nothingToCommitError(repo, true));
-  } else if (getCommit(repo, headSha).tree === treeSha) {
-    return failure(repo, nothingToCommitError(repo, false));
+  // 커밋할 것 없음 판정 — 머지 완결 커밋은 tree가 같아도 허용된다
+  if (repo.merging === undefined) {
+    if (headSha === undefined) {
+      if (repo.index.size === 0) return failure(repo, nothingToCommitError(repo, true));
+    } else if (getCommit(repo, headSha).tree === treeSha) {
+      return failure(repo, nothingToCommitError(repo, false));
+    }
   }
 
   const timestamp = repo.clock + 1;
   const signature = { name: AUTHOR_NAME, email: AUTHOR_EMAIL, timestamp };
+  const parents =
+    headSha === undefined
+      ? []
+      : repo.merging === undefined
+        ? [headSha]
+        : [headSha, repo.merging.theirs]; // 머지 완결 — MERGE_HEAD가 두 번째 부모
   const commit: GitObject = {
     type: 'commit',
     tree: treeSha,
-    parents: headSha === undefined ? [] : [headSha],
+    parents,
     author: signature,
     committer: signature,
     message,
@@ -79,7 +102,7 @@ export function gitCommit(repo: Repository, rawMessage: string): CommandResult {
   objects.set(commitSha, commit);
   diff.createdObjects.push(commitSha);
 
-  const next: Repository = { ...repo, objects, clock: timestamp };
+  const next: Repository = { ...repo, objects, clock: timestamp, merging: undefined };
 
   let label: string;
   if (repo.head.kind === 'symbolic') {
@@ -109,6 +132,9 @@ export function gitCommit(repo: Repository, rawMessage: string): CommandResult {
  * SIMPLIFIED: -m이 없으면 에디터 대신 --no-edit처럼 기존 메시지를 유지한다.
  */
 export function gitCommitAmend(repo: Repository, rawMessage?: string): CommandResult {
+  if (repo.merging !== undefined) {
+    return failure(repo, 'fatal: You are in the middle of a merge -- cannot amend.');
+  }
   const headSha = resolveHead(repo);
   if (headSha === undefined) {
     return failure(repo, 'fatal: You have nothing to amend.');
@@ -121,12 +147,7 @@ export function gitCommitAmend(repo: Repository, rawMessage?: string): CommandRe
   const message =
     rawMessage === undefined ? old.message : `${rawMessage.replace(/\n+$/, '')}\n`;
 
-  const entries: TreeEntry[] = [...repo.index.values()].map((e) => ({
-    mode: '100644',
-    name: e.name,
-    sha: e.sha,
-  }));
-  const tree: GitObject = { type: 'tree', entries };
+  const tree = indexToTree(repo);
   const treeSha = hashObject(tree);
 
   const timestamp = repo.clock + 1;

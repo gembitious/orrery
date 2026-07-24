@@ -16,12 +16,14 @@ import { computeStatus } from '../core/status';
 export interface AreaRow {
   file: string;
   /** working tree 셀: 없으면 파일이 WT에 없음 */
-  worktree?: { sha: Sha; badge?: 'untracked' | 'modified' };
+  worktree?: { sha: Sha; badge?: 'untracked' | 'modified' | 'conflicted' };
   /** WT에 없는 것이 "변경"인 경우 (index에는 있음) — 유령 셀로 표시 */
   worktreeDeleted: boolean;
   index?: { sha: Sha; badge?: 'added' | 'modified' };
   /** staged 삭제 (HEAD에는 있고 index에서 빠짐) */
   indexDeleted: boolean;
+  /** 충돌(unmerged): index 셀이 stage 1/2/3 세 버전을 품는다 */
+  conflict?: { 1?: Sha; 2?: Sha; 3?: Sha };
   head?: { sha: Sha };
 }
 
@@ -43,19 +45,23 @@ export function buildAreasView(repo: Repository): AreasView {
   const rows: AreaRow[] = files.map((file) => {
     const st = statusByFile.get(file);
     const row: AreaRow = { file, worktreeDeleted: false, indexDeleted: false };
+    const indexEntry = repo.index.get(file);
 
     const wtContent = repo.workingTree.get(file);
     if (wtContent !== undefined) {
       row.worktree = { sha: hashObject({ type: 'blob', content: wtContent }) };
-      if (st?.worktree === 'untracked' || st?.worktree === 'modified') {
+      if (st?.unmerged !== undefined) {
+        row.worktree.badge = 'conflicted'; // 충돌 마커가 든 파일
+      } else if (st?.worktree === 'untracked' || st?.worktree === 'modified') {
         row.worktree.badge = st.worktree;
       }
     } else if (st?.worktree === 'deleted') {
       row.worktreeDeleted = true;
     }
 
-    const indexEntry = repo.index.get(file);
-    if (indexEntry !== undefined) {
+    if (indexEntry?.conflicted === true) {
+      row.conflict = indexEntry.stages;
+    } else if (indexEntry !== undefined) {
       row.index = { sha: indexEntry.sha };
       if (st?.index === 'added' || st?.index === 'modified') {
         row.index.badge = st.index;

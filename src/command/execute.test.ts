@@ -108,8 +108,8 @@ describe('에러 경로', () => {
 
   it('init 후 미구현 git 명령은 명시적 미지원 에러', () => {
     const repo = run(['git init']);
-    expect(execute(repo, 'git cherry-pick abc').error).toBe(
-      "orrery: 'cherry-pick'은(는) 아직 지원하지 않습니다",
+    expect(execute(repo, 'git diff').error).toBe(
+      "orrery: 'diff'은(는) 아직 지원하지 않습니다",
     );
   });
 

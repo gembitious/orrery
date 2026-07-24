@@ -9,6 +9,9 @@ import { gitCommit, gitCommitAmend } from '../core/commands/commit';
 import { removeFile, writeFile } from '../core/commands/fs';
 import { gitInit } from '../core/commands/init';
 import { gitLog } from '../core/commands/log';
+import { gitCherryPick } from '../core/commands/cherrypick';
+import { gitMerge, gitMergeAbort } from '../core/commands/merge';
+import { gitRebase } from '../core/commands/rebase';
 import type { ResetMode } from '../core/commands/reset';
 import { gitReset } from '../core/commands/reset';
 import { gitRestoreStaged, gitRestoreWorktree } from '../core/commands/restore';
@@ -85,6 +88,36 @@ function executeGit(repo: Repository, args: Token[]): CommandResult {
       return parseReset(repo, rest);
     case 'restore':
       return parseRestore(repo, rest);
+    case 'merge': {
+      if (rest.length === 1 && !rest[0].quoted && rest[0].value === '--abort') {
+        return gitMergeAbort(repo);
+      }
+      const option = rest.find((t) => !t.quoted && t.value.startsWith('-'));
+      if (option !== undefined) {
+        return failure(
+          repo,
+          `orrery: 'git merge'의 옵션 '${option.value}'은(는) 아직 지원하지 않습니다`,
+        );
+      }
+      if (rest.length !== 1) {
+        return failure(repo, "orrery: 'git merge <브랜치|커밋>' 형식으로 입력하세요");
+      }
+      return gitMerge(repo, rest[0].value);
+    }
+    case 'rebase':
+    case 'cherry-pick': {
+      const option = rest.find((t) => !t.quoted && t.value.startsWith('-'));
+      if (option !== undefined) {
+        return failure(
+          repo,
+          `orrery: 'git ${sub}'의 옵션 '${option.value}'은(는) 아직 지원하지 않습니다`,
+        );
+      }
+      if (rest.length !== 1) {
+        return failure(repo, `orrery: 'git ${sub} <${sub === 'rebase' ? '브랜치|커밋' : '커밋'}>' 형식으로 입력하세요`);
+      }
+      return sub === 'rebase' ? gitRebase(repo, rest[0].value) : gitCherryPick(repo, rest[0].value);
+    }
     case 'rm': {
       const force = rest.some((t) => !t.quoted && t.value === '-f');
       const cached = rest.some((t) => !t.quoted && t.value === '--cached');
@@ -198,7 +231,8 @@ function parseCommit(repo: Repository, args: Token[]): CommandResult {
   if (noEdit) {
     return failure(repo, "orrery: '--no-edit'은 --amend와 함께만 지원합니다");
   }
-  if (message === undefined) {
+  // 머지 완결 커밋은 -m 없이도 저장된 MERGE_MSG를 쓴다 (에디터 대체)
+  if (message === undefined && repo.merging === undefined) {
     return failure(repo, 'orrery: 에디터가 없으므로 -m "메시지" 형식으로 입력하세요');
   }
   return gitCommit(repo, message);

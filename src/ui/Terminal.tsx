@@ -13,6 +13,49 @@ export interface TerminalEntry {
   error?: string;
 }
 
+/** 상시 노출되는 명령 레퍼런스 — 칩을 누르면 입력창에 채워진다 */
+const COMMAND_GUIDE: { group: string; items: { label: string; insert: string }[] }[] = [
+  {
+    group: '시작',
+    items: [
+      { label: 'init', insert: 'git init' },
+      { label: 'echo >', insert: 'echo "내용" > 파일.txt' },
+      { label: 'rm', insert: 'rm 파일.txt' },
+    ],
+  },
+  {
+    group: '기록',
+    items: [
+      { label: 'add', insert: 'git add ' },
+      { label: 'commit', insert: 'git commit -m ""' },
+      { label: '--amend', insert: 'git commit --amend -m ""' },
+      { label: 'status', insert: 'git status' },
+      { label: 'log', insert: 'git log' },
+    ],
+  },
+  {
+    group: '브랜치',
+    items: [
+      { label: 'branch', insert: 'git branch ' },
+      { label: 'checkout', insert: 'git checkout ' },
+      { label: '-b', insert: 'git checkout -b ' },
+      { label: 'merge', insert: 'git merge ' },
+      { label: 'rebase', insert: 'git rebase ' },
+      { label: 'cherry-pick', insert: 'git cherry-pick ' },
+    ],
+  },
+  {
+    group: '3영역',
+    items: [
+      { label: 'reset', insert: 'git reset --hard HEAD~1' },
+      { label: 'restore', insert: 'git restore ' },
+      { label: '--staged', insert: 'git restore --staged ' },
+      { label: 'stash', insert: 'git stash' },
+      { label: 'rm --cached', insert: 'git rm --cached ' },
+    ],
+  },
+];
+
 export function Terminal({
   entries,
   onCommand,
@@ -54,8 +97,7 @@ export function Terminal({
       <div className="terminal-log" ref={logRef}>
         {entries.length === 0 && (
           <p className="hint">
-            지원 명령: git init · add · commit -m · status · branch · checkout · log · reset ·
-            restore · stash, 그리고 echo &quot;내용&quot; &gt; 파일 · rm 파일 — ↑↓로 히스토리 탐색
+            아래 명령 칩을 누르거나 직접 입력해 보세요 — 실제 git CLI 문법 그대로, ↑↓로 히스토리
           </p>
         )}
         {entries.map((entry, i) => (
@@ -71,6 +113,28 @@ export function Terminal({
             ))}
             {entry.error !== undefined && <div className="terminal-err">{entry.error}</div>}
           </div>
+        ))}
+      </div>
+      <div className="terminal-guide" aria-label="사용 가능한 명령">
+        {COMMAND_GUIDE.map((group) => (
+          <span className="guide-group" key={group.group}>
+            <span className="guide-label">{group.group}</span>
+            {group.items.map((item) => (
+              <button
+                type="button"
+                className="guide-chip"
+                key={item.label}
+                title={item.insert}
+                onClick={() => {
+                  setValue(item.insert);
+                  setNav(idleNav);
+                  inputRef.current?.focus();
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </span>
         ))}
       </div>
       <form

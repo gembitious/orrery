@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '../../command/execute';
 import { run } from '../../command/run';
+import { stagedSha } from '../repository';
 import { computeStatus } from '../status';
 
 const BASE = ['git init', 'echo hello > f.txt', 'git add f.txt', 'git commit -m c1'];
@@ -73,8 +74,8 @@ describe('git restore --staged <file> — index ← HEAD', () => {
     const result = execute(repo, 'git restore --staged f.txt');
 
     expect(result.error).toBeUndefined();
-    expect(result.repo.index.get('f.txt')?.sha).toBe(
-      run(BASE).index.get('f.txt')?.sha, // HEAD 시점의 blob
+    expect(stagedSha(result.repo.index.get('f.txt'))).toBe(
+      stagedSha(run(BASE).index.get('f.txt')), // HEAD 시점의 blob
     );
     expect(result.repo.workingTree.get('f.txt')).toBe('v2'); // WT는 안 건드린다
     expect(computeStatus(result.repo).entries).toEqual([{ file: 'f.txt', worktree: 'modified' }]);

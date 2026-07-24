@@ -238,16 +238,75 @@ svg [data-flip-key] {
 .badge-modified { background: var(--badge-modified); }
 .badge-untracked { background: var(--badge-untracked); }
 .badge-deleted { background: var(--badge-deleted); }
+.badge-conflicted { background: var(--badge-deleted); }
+
+.cell-conflict {
+  background: color-mix(in srgb, var(--badge-deleted) 8%, transparent);
+}
+.stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.stage-n {
+  font-size: 10px;
+  color: var(--badge-deleted);
+  border: 1px solid var(--badge-deleted);
+  border-radius: 2px;
+  padding: 0 3px;
+  line-height: 1.4;
+}
 
 /* ── 터미널 ───────────────────────────────────── */
 .terminal {
   display: flex;
   flex-direction: column;
-  height: 230px;
+  height: 270px;
   margin: 0 20px 16px;
   background: var(--term-bg);
   border: 1px solid var(--line);
   border-radius: 4px;
+}
+
+/* ── 상시 명령 가이드 ─────────────────────────── */
+.terminal-guide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 7px 14px;
+  border-top: 1px solid #2c2820;
+}
+.guide-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.guide-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--term-dim);
+  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif;
+  margin-right: 2px;
+}
+.guide-chip {
+  font: inherit;
+  font-size: 11px;
+  color: var(--term-ink);
+  background: #262218;
+  border: 1px solid #3a352a;
+  border-radius: 3px;
+  padding: 1px 7px;
+  cursor: pointer;
+}
+.guide-chip:hover {
+  border-color: var(--accent);
+  color: #fff;
+}
+.guide-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .terminal-log {
   flex: 1;
