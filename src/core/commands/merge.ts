@@ -16,6 +16,7 @@ import type { Head, IndexEntry, Repository } from '../repository';
 import { conflictedFiles, resolveHead } from '../repository';
 import type { CommandResult } from '../result';
 import { emptyDiff, failure, success, workspaceDiff } from '../result';
+import { threeWayTrees } from '../merge3';
 import { blobContent, commitTreeMap, getCommit, isAncestor, resolveRevision } from '../revision';
 import { computeStatus } from '../status';
 import { AUTHOR_EMAIL, AUTHOR_NAME } from './commit';
@@ -143,24 +144,7 @@ export function gitMerge(repo: Repository, targetText: string): CommandResult {
   const files = [
     ...new Set([...baseTree.keys(), ...oursTree.keys(), ...theirsTree.keys()]),
   ].sort();
-
-  const merged = new Map<string, Sha>();
-  const conflicts: string[] = [];
-  for (const file of files) {
-    const base = baseTree.get(file);
-    const ours = oursTree.get(file);
-    const theirs = theirsTree.get(file);
-    const winner =
-      ours === theirs ? ours // 양쪽이 같다 (둘 다 삭제 포함)
-      : base === ours ? theirs // 우리는 안 바꿨다 → 그쪽 변경 채택
-      : base === theirs ? ours // 그쪽은 안 바꿨다 → 우리 것 유지
-      : null; // 양쪽이 서로 다르게 바꿨다
-    if (winner === null) {
-      conflicts.push(file);
-    } else if (winner !== undefined) {
-      merged.set(file, winner);
-    }
-  }
+  const { merged, conflicts } = threeWayTrees(baseTree, oursTree, theirsTree);
 
   // 머지가 실제로 바꿀 파일(충돌 파일 포함)에 로컬 변경이 있으면 거부
   const statusByFile = new Map(status.entries.map((e) => [e.file, e]));
