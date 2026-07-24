@@ -22,7 +22,7 @@ function App() {
   const handleCommand = (input: string) => {
     flipRef.current.capture(); // First: 실행 직전 위치 기록
     const result = execute(repo, input);
-    slidesRef.current = deriveSlides(result.diff, result.repo);
+    slidesRef.current = deriveSlides(result.diff, repo, result.repo);
     setRepo(result.repo);
     setEntries((prev) => [
       ...prev,

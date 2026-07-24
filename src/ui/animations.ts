@@ -1,15 +1,22 @@
 /**
  * StateDiff → "무엇이 날아가는가" 결정 (순수 함수 — DOM 무관).
  *
- * 3영역 슬라이드의 의미론:
- *   add    → working tree의 내용(blob)이 index로 들어간다: wt 셀 → idx 셀
- *   commit → index의 스냅샷이 HEAD가 된다: idx 셀 → head 셀
- * checkout은 셀들이 통째로 바뀌므로 슬라이드 없이 FLIP/펄스에 맡긴다
- * (headChange가 있으면 add 슬라이드를 만들지 않는 이유).
+ * 3영역에서 내용(blob)이 흐르는 방향을 고스트 칩으로 보여준다:
+ *   add              → wt → idx
+ *   commit           → idx → head
+ *   restore --staged → head → idx   (git reset의 제자리 unstage도 동일)
+ *   restore          → idx → wt     (reset --hard의 제자리 복원도 동일)
+ * checkout이나 브랜치를 옮기는 reset은 셀들이 통째로 바뀌므로 슬라이드 없이
+ * FLIP/펄스에 맡긴다 (headChange 또는 movedRefs가 있으면 이동 슬라이드 제외).
+ *
+ * 방향 판정의 근거는 전부 "내용의 해시": staged된 sha가 WT 내용의 해시와 같으면
+ * WT에서 온 것이고, HEAD tree의 sha와 같으면 HEAD에서 온 것이다.
  */
 import { hashObject, shortSha } from '../core/objects';
 import type { Repository } from '../core/repository';
+import { resolveHead } from '../core/repository';
 import type { StateDiff } from '../core/result';
+import { commitTreeMap } from '../core/revision';
 
 export interface Slide {
   fromKey: string;
@@ -18,13 +25,15 @@ export interface Slide {
   label: string;
 }
 
-export function deriveSlides(diff: StateDiff, after: Repository): Slide[] {
+export function deriveSlides(diff: StateDiff, before: Repository, after: Repository): Slide[] {
   const slides: Slide[] = [];
+  const slid = new Set<string>();
 
-  // git add: WT → index. checkout(headChange)이나 reset(movedRefs)의 index 교체와
-  // 구분하기 위해, "staged된 sha가 지금 WT 내용의 해시와 같다"는 것까지 확인한다 —
-  // 내용이 실제로 WT에서 왔을 때만 슬라이드가 의미를 갖는다.
   if (diff.headChange === undefined && diff.movedRefs.length === 0) {
+    const headSha = resolveHead(after);
+    const headTree = headSha === undefined ? new Map<string, string>() : commitTreeMap(after, headSha);
+
+    // ① add: 새 index 내용이 WT 내용과 같다 → wt → idx
     for (const change of diff.indexChanges) {
       if (change.kind !== 'staged' && change.kind !== 'modified') continue;
       const entry = after.index.get(change.file);
@@ -37,10 +46,42 @@ export function deriveSlides(diff: StateDiff, after: Repository): Slide[] {
         toKey: `cell:idx:${change.file}`,
         label: shortSha(entry.sha),
       });
+      slid.add(change.file);
+    }
+
+    // ② restore --staged / 제자리 unstage: 새 index 내용이 HEAD와 같다 → head → idx
+    for (const change of diff.indexChanges) {
+      if (slid.has(change.file)) continue; // ①이 이미 설명한 파일 (WT에서 온 것이 우선)
+      if (change.kind !== 'staged' && change.kind !== 'modified') continue;
+      const entry = after.index.get(change.file);
+      if (entry === undefined) continue;
+      if (headTree.get(change.file) !== entry.sha) continue;
+      slides.push({
+        fromKey: `cell:head:${change.file}`,
+        toKey: `cell:idx:${change.file}`,
+        label: shortSha(entry.sha),
+      });
+      slid.add(change.file);
+    }
+
+    // ③ restore: 새 WT 내용이 index와 같다 → idx → wt
+    for (const change of diff.workingTreeChanges) {
+      if (change.kind !== 'modified' && change.kind !== 'created') continue;
+      const content = after.workingTree.get(change.file);
+      if (content === undefined) continue;
+      if (before.workingTree.get(change.file) === content) continue; // 실제로 바뀐 것만
+      const entry = after.index.get(change.file);
+      if (entry === undefined) continue;
+      if (hashObject({ type: 'blob', content }) !== entry.sha) continue;
+      slides.push({
+        fromKey: `cell:idx:${change.file}`,
+        toKey: `cell:wt:${change.file}`,
+        label: shortSha(entry.sha),
+      });
     }
   }
 
-  // git commit: 새로 만들어진 커밋으로 ref(또는 detached HEAD)가 이동했는가
+  // ④ commit: 새로 만들어진 커밋으로 ref(또는 detached HEAD)가 이동 → idx → head
   const newCommit =
     diff.movedRefs.find((m) => diff.createdObjects.includes(m.to))?.to ??
     (diff.headChange?.to.kind === 'detached' && diff.createdObjects.includes(diff.headChange.to.sha)

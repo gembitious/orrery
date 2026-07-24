@@ -11,6 +11,7 @@ import { gitInit } from '../core/commands/init';
 import { gitLog } from '../core/commands/log';
 import type { ResetMode } from '../core/commands/reset';
 import { gitReset } from '../core/commands/reset';
+import { gitRestoreStaged, gitRestoreWorktree } from '../core/commands/restore';
 import { gitStatus } from '../core/commands/status';
 import type { Repository } from '../core/repository';
 import type { CommandResult } from '../core/result';
@@ -80,6 +81,8 @@ function executeGit(repo: Repository, args: Token[]): CommandResult {
       return parseCheckout(repo, rest);
     case 'reset':
       return parseReset(repo, rest);
+    case 'restore':
+      return parseRestore(repo, rest);
     case 'status': {
       if (rest.length > 0) {
         return failure(
@@ -227,6 +230,31 @@ function parseReset(repo: Repository, args: Token[]): CommandResult {
   }
 
   return gitReset(repo, mode, target ?? 'HEAD');
+}
+
+/** `git restore [--staged] <file>...` */
+function parseRestore(repo: Repository, args: Token[]): CommandResult {
+  let staged = false;
+  const paths: string[] = [];
+
+  for (const token of args) {
+    if (!token.quoted && token.value === '--staged') {
+      staged = true;
+      continue;
+    }
+    if (!token.quoted && token.value.startsWith('-')) {
+      return failure(
+        repo,
+        `orrery: 'git restore'의 옵션 '${token.value}'은(는) 아직 지원하지 않습니다`,
+      );
+    }
+    paths.push(token.value);
+  }
+
+  if (paths.length === 0) {
+    return failure(repo, 'fatal: you must specify path(s) to restore');
+  }
+  return staged ? gitRestoreStaged(repo, paths) : gitRestoreWorktree(repo, paths);
 }
 
 /**
