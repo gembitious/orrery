@@ -82,6 +82,14 @@ function formatSignature(sig: Signature): string {
   return `${sig.name} <${sig.email}> ${sig.timestamp} +0000`;
 }
 
+/** tree 엔트리를 실제 저장 순서(이름의 UTF-8 바이트순)로 정렬해 반환 */
+export function sortedTreeEntries(entries: TreeEntry[]): TreeEntry[] {
+  return entries
+    .map((entry) => ({ entry, nameBytes: encoder.encode(entry.name) }))
+    .sort((a, b) => compareBytes(a.nameBytes, b.nameBytes))
+    .map(({ entry }) => entry);
+}
+
 /** 헤더(`<type> <size>\0`)를 제외한 객체 본문의 바이트열 */
 export function serializeBody(obj: GitObject): Uint8Array {
   switch (obj.type) {

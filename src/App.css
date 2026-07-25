@@ -81,6 +81,20 @@
   padding: 16px 20px;
   overflow: hidden;
 }
+.side-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+.side-column > .areas-panel {
+  flex: 1;
+  min-height: 0;
+}
+.side-column > .inspector-panel {
+  flex: 1;
+  min-height: 0;
+}
 
 /* ── 패널 공통 ─────────────────────────────────── */
 .panel {
@@ -255,6 +269,121 @@ svg [data-flip-key] {
   border-radius: 2px;
   padding: 0 3px;
   line-height: 1.4;
+}
+
+/* ── 인스펙터 ─────────────────────────────────── */
+.node {
+  cursor: pointer;
+}
+.node:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.node-selected {
+  stroke: var(--badge-untracked);
+  stroke-width: 3;
+}
+.sha-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+.sha-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.inspector-close {
+  float: right;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+.inspector-close:hover {
+  color: var(--ink);
+}
+.inspector-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.inspector-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.obj-type {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  padding: 1px 6px;
+  color: #fff;
+}
+.obj-blob { background: var(--badge-untracked); }
+.obj-tree { background: var(--badge-added); }
+.obj-commit { background: var(--accent); color: var(--accent-contrast); }
+.inspector-sha {
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.inspector-bytes {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--chip);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+  max-height: 240px;
+}
+.tok-nul {
+  color: var(--badge-deleted);
+  font-weight: 700;
+  padding: 0 1px;
+}
+.tok-sha {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.tok-sha-raw {
+  border: 1px dashed var(--accent);
+  border-radius: 2px;
+  padding: 0 3px;
+}
+.tok-sha:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.inspector-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif;
+}
+.inspector-note code {
+  background: var(--chip);
+  border-radius: 2px;
+  padding: 0 4px;
 }
 
 /* ── 터미널 ───────────────────────────────────── */

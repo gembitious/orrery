@@ -13,15 +13,20 @@ function Cell({
   flipKey,
   cell,
   deleted,
+  onSelect,
 }: {
   flipKey: string;
   cell?: { sha: string; badge?: string };
   deleted: boolean;
+  onSelect: (sha: string) => void;
 }) {
   if (cell !== undefined) {
     return (
       <div className="cell" data-flip-key={flipKey} data-flip-val={cell.sha}>
-        <span className="cell-sha">{shortSha(cell.sha)}</span>
+        <button type="button" className="cell-sha sha-link" title="인스펙터로 열기"
+          onClick={() => onSelect(cell.sha)}>
+          {shortSha(cell.sha)}
+        </button>
         {cell.badge !== undefined && (
           <span className={`badge badge-${cell.badge}`}>{cell.badge}</span>
         )}
@@ -43,7 +48,15 @@ function Cell({
 }
 
 /** 충돌 셀: stage 1/2/3 세 버전을 그대로 보여준다 — 이것이 unmerged index의 실체 */
-function ConflictCell({ flipKey, stages }: { flipKey: string; stages: { 1?: string; 2?: string; 3?: string } }) {
+function ConflictCell({
+  flipKey,
+  stages,
+  onSelect,
+}: {
+  flipKey: string;
+  stages: { 1?: string; 2?: string; 3?: string };
+  onSelect: (sha: string) => void;
+}) {
   return (
     <div className="cell cell-conflict" data-flip-key={flipKey} data-flip-val="conflict">
       <span className="badge badge-conflicted">unmerged</span>
@@ -51,7 +64,10 @@ function ConflictCell({ flipKey, stages }: { flipKey: string; stages: { 1?: stri
         stages[n] !== undefined ? (
           <span className="stage" key={n}>
             <span className="stage-n">{n}</span>
-            <span className="cell-sha">{shortSha(stages[n])}</span>
+            <button type="button" className="cell-sha sha-link" title="인스펙터로 열기"
+              onClick={() => { const sha = stages[n]; if (sha !== undefined) onSelect(sha); }}>
+              {shortSha(stages[n])}
+            </button>
           </span>
         ) : null,
       )}
@@ -59,24 +75,30 @@ function ConflictCell({ flipKey, stages }: { flipKey: string; stages: { 1?: stri
   );
 }
 
-function Row({ row }: { row: AreaRow }) {
+function Row({ row, onSelect }: { row: AreaRow; onSelect: (sha: string) => void }) {
   return (
     <>
       <div className="cell cell-file" data-flip-key={`cell:file:${row.file}`} data-flip-enter="fade">
         {row.file}
       </div>
-      <Cell flipKey={`cell:wt:${row.file}`} cell={row.worktree} deleted={row.worktreeDeleted} />
+      <Cell flipKey={`cell:wt:${row.file}`} cell={row.worktree} deleted={row.worktreeDeleted} onSelect={onSelect} />
       {row.conflict !== undefined ? (
-        <ConflictCell flipKey={`cell:idx:${row.file}`} stages={row.conflict} />
+        <ConflictCell flipKey={`cell:idx:${row.file}`} stages={row.conflict} onSelect={onSelect} />
       ) : (
-        <Cell flipKey={`cell:idx:${row.file}`} cell={row.index} deleted={row.indexDeleted} />
+        <Cell flipKey={`cell:idx:${row.file}`} cell={row.index} deleted={row.indexDeleted} onSelect={onSelect} />
       )}
-      <Cell flipKey={`cell:head:${row.file}`} cell={row.head} deleted={false} />
+      <Cell flipKey={`cell:head:${row.file}`} cell={row.head} deleted={false} onSelect={onSelect} />
     </>
   );
 }
 
-export function AreasPanel({ repo }: { repo: Repository }) {
+export function AreasPanel({
+  repo,
+  onSelect,
+}: {
+  repo: Repository;
+  onSelect: (sha: string) => void;
+}) {
   const view = buildAreasView(repo);
 
   return (
@@ -95,7 +117,7 @@ export function AreasPanel({ repo }: { repo: Repository }) {
             HEAD <span className="head-context">· {view.headLabel}</span>
           </div>
           {view.rows.map((row) => (
-            <Row key={row.file} row={row} />
+            <Row key={row.file} row={row} onSelect={onSelect} />
           ))}
         </div>
       )}

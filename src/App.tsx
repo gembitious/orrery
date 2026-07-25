@@ -7,6 +7,7 @@ import { deriveSlides } from './ui/animations';
 import { AreasPanel } from './ui/AreasPanel';
 import { createFlip } from './ui/flip';
 import { GraphPanel } from './ui/GraphPanel';
+import { Inspector } from './ui/Inspector';
 import type { TerminalEntry } from './ui/Terminal';
 import { Terminal } from './ui/Terminal';
 import './App.css';
@@ -16,6 +17,8 @@ function App() {
   const [entries, setEntries] = useState<TerminalEntry[]>([]);
   // stash 내부 커밋(WIP+index) 노출 토글 — 기본 노출이 orrery의 존재 이유
   const [showStash, setShowStash] = useState(true);
+  // 인스펙터가 열어둔 객체 sha
+  const [inspected, setInspected] = useState<string | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const flipRef = useRef(createFlip(() => rootRef.current));
@@ -53,8 +56,18 @@ function App() {
         </label>
       </header>
       <main className="app-main">
-        <GraphPanel repo={repo} showStash={showStash} />
-        <AreasPanel repo={repo} />
+        <GraphPanel repo={repo} showStash={showStash} selected={inspected} onSelect={setInspected} />
+        <div className="side-column">
+          <AreasPanel repo={repo} onSelect={setInspected} />
+          {inspected !== null && (
+            <Inspector
+              repo={repo}
+              sha={inspected}
+              onSelect={setInspected}
+              onClose={() => setInspected(null)}
+            />
+          )}
+        </div>
       </main>
       <Terminal entries={entries} onCommand={handleCommand} />
     </div>

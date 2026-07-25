@@ -54,7 +54,18 @@ function Chip({ x, text, kind }: { x: number; text: string; kind: 'head' | 'bran
   );
 }
 
-export function GraphPanel({ repo, showStash }: { repo: Repository; showStash: boolean }) {
+export function GraphPanel({
+  repo,
+  showStash,
+  selected,
+  onSelect,
+}: {
+  repo: Repository;
+  showStash: boolean;
+  /** 인스펙터가 열어둔 객체 (커밋이면 노드를 강조) */
+  selected: string | null;
+  onSelect: (sha: string) => void;
+}) {
   const hidden = showStash ? new Set<string>() : stashInternalCommits(repo);
   const nodes = listCommitsByTime(repo).filter((n) => !hidden.has(n.sha));
   const layout = layoutCommits(nodes);
@@ -98,12 +109,22 @@ export function GraphPanel({ repo, showStash }: { repo: Repository; showStash: b
           {nodes.map((node) => {
             const p = layout.positions.get(node.sha);
             if (p === undefined) return null;
+            const classes = ['node'];
+            if (node.sha === headSha) classes.push('node-head');
+            if (node.sha === selected) classes.push('node-selected');
             return (
               <g key={node.sha} transform={`translate(${laneX(p.lane)} ${rowY(p.row)})`}>
                 <g data-flip-key={`node:${node.sha}`} data-flip-enter="pop">
                   <circle
-                    className={node.sha === headSha ? 'node node-head' : 'node'}
+                    className={classes.join(' ')}
                     r={NODE_R}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`커밋 ${shortSha(node.sha)} 인스펙터로 열기`}
+                    onClick={() => onSelect(node.sha)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === 'Enter' || ev.key === ' ') onSelect(node.sha);
+                    }}
                   />
                 </g>
               </g>
